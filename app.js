@@ -95,41 +95,144 @@ class ExpenseTracker {
         });
     }
 
-    handleFile(file) {
+    async handleFile(file) {
         if (!this.selectedBank) {
             alert('Kérjük, először válassza ki a bankját!');
             return;
         }
 
-        // Simulate file processing
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            this.processStatement(e.target.result, file.name);
-        };
+        console.log(`Processing file: ${file.name}, type: ${file.type}, bank: ${this.selectedBank}`);
 
-        if (file.type === 'application/pdf') {
-            alert('PDF feldolgozás még fejlesztés alatt áll. Kérjük, használjon CSV formátumot.');
-            return;
+        // Handle different file types
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            // Process PDF
+            this.showProcessingStatus('PDF feldolgozás folyamatban...');
+            
+            try {
+                const pdfProcessor = new PDFProcessor();
+                const transactions = await pdfProcessor.processPDF(file, this.selectedBank);
+                
+                if (transactions && transactions.length > 0) {
+                    this.addTransactions(transactions);
+                    this.showUploadStatus(transactions.length);
+                } else {
+                    alert('Nem találtunk tranzakciókat a PDF fájlban. Kérjük, ellenőrizze a fájlt.');
+                }
+            } catch (error) {
+                console.error('PDF processing error:', error);
+                alert('Hiba történt a PDF feldolgozása során. Kérjük, próbálja újra.');
+            }
+        } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || 
+                   file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            // Process Excel
+            alert('Excel feldolgozás hamarosan elérhető lesz.');
+        } else {
+            // Process as CSV/text
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.processCSVStatement(e.target.result, file.name);
+            };
+            reader.readAsText(file);
         }
-
-        reader.readAsText(file);
     }
 
-    processStatement(content, filename) {
-        // Simulate parsing based on bank
-        const mockTransactions = this.generateMockTransactions();
+    showProcessingStatus(message) {
+        const uploadArea = document.getElementById('uploadArea');
+        const originalContent = uploadArea.innerHTML;
         
-        // Add to existing transactions
-        this.transactions.push(...mockTransactions);
+        uploadArea.innerHTML = `
+            <div class="processing-status">
+                <div class="spinner"></div>
+                <h3>${message}</h3>
+                <p>Ez eltarthat néhány másodpercig...</p>
+            </div>
+        `;
+        
+        // Store original content to restore later
+        uploadArea.dataset.originalContent = originalContent;
+    }
+
+    addTransactions(newTransactions) {
+        // Check for duplicates
+        const existingHashes = new Set(
+            this.transactions.map(t => this.getTransactionHash(t))
+        );
+        
+        const uniqueTransactions = newTransactions.filter(t => {
+            const hash = this.getTransactionHash(t);
+            return !existingHashes.has(hash);
+        });
+        
+        // Add unique transactions
+        this.transactions.push(...uniqueTransactions);
         this.saveTransactions();
+        
+        console.log(`Added ${uniqueTransactions.length} unique transactions (${newTransactions.length - uniqueTransactions.length} duplicates skipped)`);
+    }
 
-        // Show success
-        this.showUploadStatus(mockTransactions.length);
+    getTransactionHash(transaction) {
+        // Create a hash for duplicate detection
+        return `${transaction.date}_${transaction.amount}_${transaction.description}`;
+    }
 
-        // Switch to transactions tab
-        setTimeout(() => {
-            this.switchTab('transactions');
-        }, 2000);
+    processCSVStatement(content, filename) {
+        // Parse CSV based on bank
+        const transactions = this.parseCSV(content, this.selectedBank);
+        
+        if (transactions.length > 0) {
+            this.addTransactions(transactions);
+            this.showUploadStatus(transactions.length);
+            
+            // Switch to transactions tab
+            setTimeout(() => {
+                this.switchTab('transactions');
+            }, 2000);
+        } else {
+            alert('Nem találtunk tranzakciókat a CSV fájlban.');
+        }
+    }
+
+    parseCSV(content, bankType) {
+        // Basic CSV parsing - can be enhanced based on bank format
+        const lines = content.split('\n');
+        const transactions = [];
+        
+        // Skip header
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Parse CSV line (simple implementation)
+            const parts = line.split(/[;,\t]/);
+            if (parts.length >= 3) {
+                transactions.push({
+                    id: Date.now() + i,
+                    date: this.parseCSVDate(parts[0]),
+                    description: parts[1] || 'N/A',
+                    amount: this.parseCSVAmount(parts[2]),
+                    merchant: parts[1] ? parts[1].split(' ')[0] : 'Unknown',
+                    category: '📌 Egyéb',
+                    bank: bankType.toUpperCase()
+                });
+            }
+        }
+        
+        return transactions;
+    }
+
+    parseCSVDate(dateStr) {
+        // Try to parse various date formats
+        const date = new Date(dateStr);
+        if (!isNaN(date)) {
+            return date.toISOString().split('T')[0];
+        }
+        return dateStr;
+    }
+
+    parseCSVAmount(amountStr) {
+        // Parse amount, handle Hungarian format
+        const cleaned = amountStr.replace(/\s/g, '').replace(',', '.');
+        return parseFloat(cleaned) || 0;
     }
 
     showUploadStatus(count) {
