@@ -109,6 +109,14 @@ class ExpenseTracker {
             this.showProcessingStatus('PDF feldolgozás folyamatban...');
             
             try {
+                // Check if PDFProcessor is loaded
+                if (typeof PDFProcessor === 'undefined') {
+                    console.error('PDFProcessor not loaded yet');
+                    alert('PDF feldolgozó betöltése folyamatban. Kérjük, próbálja újra néhány másodperc múlva.');
+                    location.reload(); // Force reload to load scripts
+                    return;
+                }
+                
                 const pdfProcessor = new PDFProcessor();
                 const transactions = await pdfProcessor.processPDF(file, this.selectedBank);
                 
