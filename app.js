@@ -112,13 +112,36 @@ class ExpenseTracker {
                 // Check if PDFProcessor is loaded
                 if (typeof PDFProcessor === 'undefined') {
                     console.error('PDFProcessor not loaded yet');
-                    alert('PDF feldolgozó betöltése folyamatban. Kérjük, próbálja újra néhány másodperc múlva.');
-                    location.reload(); // Force reload to load scripts
+                    // Wait a bit and retry
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Try loading the script manually
+                    const script = document.createElement('script');
+                    script.src = 'pdf-processor.js?v=' + Date.now();
+                    document.head.appendChild(script);
+                    
+                    await new Promise(resolve => {
+                        script.onload = resolve;
+                        script.onerror = () => {
+                            this.restoreUploadArea();
+                            alert('PDF feldolgozó betöltése sikertelen. Kérjük, frissítse az oldalt.');
+                            resolve();
+                        };
+                    });
+                }
+                
+                // Check again
+                if (typeof PDFProcessor === 'undefined') {
+                    this.restoreUploadArea();
+                    alert('PDF feldolgozó nem elérhető. Kérjük, használjon CSV formátumot.');
                     return;
                 }
                 
                 const pdfProcessor = new PDFProcessor();
                 const transactions = await pdfProcessor.processPDF(file, this.selectedBank);
+                
+                // Restore upload area
+                this.restoreUploadArea();
                 
                 if (transactions && transactions.length > 0) {
                     this.addTransactions(transactions);
@@ -128,7 +151,8 @@ class ExpenseTracker {
                 }
             } catch (error) {
                 console.error('PDF processing error:', error);
-                alert('Hiba történt a PDF feldolgozása során. Kérjük, próbálja újra.');
+                this.restoreUploadArea();
+                alert('Hiba történt a PDF feldolgozása során: ' + error.message);
             }
         } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || 
                    file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
@@ -146,7 +170,11 @@ class ExpenseTracker {
 
     showProcessingStatus(message) {
         const uploadArea = document.getElementById('uploadArea');
-        const originalContent = uploadArea.innerHTML;
+        
+        // Store original content if not already stored
+        if (!this.originalUploadContent) {
+            this.originalUploadContent = uploadArea.innerHTML;
+        }
         
         uploadArea.innerHTML = `
             <div class="processing-status">
@@ -155,9 +183,15 @@ class ExpenseTracker {
                 <p>Ez eltarthat néhány másodpercig...</p>
             </div>
         `;
-        
-        // Store original content to restore later
-        uploadArea.dataset.originalContent = originalContent;
+    }
+
+    restoreUploadArea() {
+        const uploadArea = document.getElementById('uploadArea');
+        if (this.originalUploadContent) {
+            uploadArea.innerHTML = this.originalUploadContent;
+            // Re-attach event listeners
+            this.setupUpload();
+        }
     }
 
     addTransactions(newTransactions) {

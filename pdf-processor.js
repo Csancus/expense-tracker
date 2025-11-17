@@ -3,10 +3,32 @@
 
 class PDFProcessor {
     constructor() {
-        this.loadPDFJS();
+        this.pdfJSLoaded = false;
+        this.pdfJSLoading = false;
     }
 
-    async loadPDFJS() {
+    async ensurePDFJSLoaded() {
+        // If already loaded, return immediately
+        if (this.pdfJSLoaded && window.pdfjsLib) {
+            return true;
+        }
+
+        // If currently loading, wait
+        if (this.pdfJSLoading) {
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (this.pdfJSLoaded) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+            return true;
+        }
+
+        // Start loading
+        this.pdfJSLoading = true;
+
         // Load PDF.js library if not already loaded
         if (!window.pdfjsLib) {
             const script = document.createElement('script');
@@ -14,18 +36,37 @@ class PDFProcessor {
             document.head.appendChild(script);
             
             // Wait for script to load
-            await new Promise(resolve => {
-                script.onload = resolve;
+            await new Promise((resolve, reject) => {
+                script.onload = () => {
+                    // Configure worker
+                    if (window.pdfjsLib) {
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = 
+                            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        this.pdfJSLoaded = true;
+                        this.pdfJSLoading = false;
+                        resolve();
+                    } else {
+                        reject(new Error('PDF.js failed to load'));
+                    }
+                };
+                script.onerror = () => {
+                    this.pdfJSLoading = false;
+                    reject(new Error('Failed to load PDF.js library'));
+                };
             });
-            
-            // Configure worker
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 
-                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        } else {
+            this.pdfJSLoaded = true;
+            this.pdfJSLoading = false;
         }
+
+        return true;
     }
 
     async processPDF(file, bankType) {
         console.log(`Processing PDF for ${bankType} bank...`);
+        
+        // Ensure PDF.js is loaded
+        await this.ensurePDFJSLoaded();
         
         const arrayBuffer = await this.fileToArrayBuffer(file);
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
