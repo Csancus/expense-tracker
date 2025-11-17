@@ -1,0 +1,41 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "description": "Smart personal finance management tool with multi-bank statement parsing and family budget tracking",
+  "scripts": {
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\"",
+    "build": "npm run frontend:build && npm run backend:build",
+    "start": "npm run backend:start",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:build": "cd backend && npm run build",
+    "backend:start": "cd backend && npm start",
+    "test": "npm run frontend:test && npm run backend:test",
+    "frontend:test": "cd frontend && npm test",
+    "backend:test": "cd backend && npm test",
+    "ml:start": "cd ml-engine && python app.py",
+    "setup": "npm run setup:frontend && npm run setup:backend && npm run setup:ml",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:backend": "cd backend && npm install",
+    "setup:ml": "cd ml-engine && pip install -r requirements.txt"
+  },
+  "keywords": [
+    "finance",
+    "expense-tracker",
+    "budget",
+    "bank-statements",
+    "personal-finance",
+    "machine-learning",
+    "categorization"
+  ],
+  "author": "Csancus",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ]
+}
