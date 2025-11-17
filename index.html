@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker - Költség Nyilvántartó</title>
+    <meta name="description" content="Smart personal finance management tool - Bankszámlakivonat feldolgozás és költségvetés követés">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-content">
+                <h1>💰 Expense Tracker</h1>
+                <p class="subtitle">Intelligens költségnyilvántartó és családi költségvetés kezelő</p>
+            </div>
+        </header>
+
+        <nav class="nav">
+            <button class="nav-btn active" data-tab="upload">📤 Feltöltés</button>
+            <button class="nav-btn" data-tab="transactions">📋 Tranzakciók</button>
+            <button class="nav-btn" data-tab="analytics">📊 Elemzések</button>
+            <button class="nav-btn" data-tab="settings">⚙️ Beállítások</button>
+        </nav>
+
+        <main class="main">
+            <!-- Upload Section -->
+            <section id="upload" class="tab-content active">
+                <div class="upload-container">
+                    <h2>Bankszámlakivonat feltöltése</h2>
+                    <div class="bank-selector">
+                        <h3>Válassza ki a bankját:</h3>
+                        <div class="bank-grid">
+                            <button class="bank-btn" data-bank="otp">
+                                <span class="bank-logo">🏦</span>
+                                <span>OTP Bank</span>
+                            </button>
+                            <button class="bank-btn" data-bank="raiffeisen">
+                                <span class="bank-logo">🏛️</span>
+                                <span>Raiffeisen</span>
+                            </button>
+                            <button class="bank-btn" data-bank="erste">
+                                <span class="bank-logo">🏪</span>
+                                <span>Erste</span>
+                            </button>
+                            <button class="bank-btn" data-bank="revolut">
+                                <span class="bank-logo">💳</span>
+                                <span>Revolut</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept=".csv,.pdf,.xlsx,.xls" hidden>
+                        <div class="upload-prompt">
+                            <span class="upload-icon">📁</span>
+                            <h3>Húzza ide a fájlt vagy kattintson a tallózáshoz</h3>
+                            <p>Támogatott formátumok: CSV, PDF, Excel</p>
+                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                Fájl kiválasztása
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="upload-status" id="uploadStatus" style="display: none;">
+                        <div class="status-icon">✅</div>
+                        <h3>Sikeres feldolgozás!</h3>
+                        <p class="status-details"></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transactions Section -->
+            <section id="transactions" class="tab-content">
+                <div class="transactions-container">
+                    <h2>Tranzakciók</h2>
+                    
+                    <div class="filters">
+                        <input type="text" placeholder="🔍 Keresés..." class="search-input">
+                        <select class="filter-select">
+                            <option value="">Minden kategória</option>
+                            <option value="food">🍔 Élelmiszer</option>
+                            <option value="transport">🚗 Közlekedés</option>
+                            <option value="utilities">🏠 Rezsi</option>
+                            <option value="shopping">🛍️ Vásárlás</option>
+                            <option value="entertainment">🎬 Szórakozás</option>
+                        </select>
+                        <input type="date" class="date-filter">
+                        <input type="date" class="date-filter">
+                    </div>
+
+                    <div class="transactions-list" id="transactionsList">
+                        <div class="transaction-item">
+                            <div class="transaction-date">2024-01-15</div>
+                            <div class="transaction-desc">
+                                <span class="merchant">Tesco</span>
+                                <span class="category">🍔 Élelmiszer</span>
+                            </div>
+                            <div class="transaction-amount expense">-12,450 Ft</div>
+                        </div>
+                        <div class="transaction-item">
+                            <div class="transaction-date">2024-01-14</div>
+                            <div class="transaction-desc">
+                                <span class="merchant">MOL</span>
+                                <span class="category">🚗 Közlekedés</span>
+                            </div>
+                            <div class="transaction-amount expense">-8,500 Ft</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section id="analytics" class="tab-content">
+                <div class="analytics-container">
+                    <h2>Pénzügyi elemzések</h2>
+                    
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <h3>Havi bevétel</h3>
+                            <p class="amount income">+450,000 Ft</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Havi kiadás</h3>
+                            <p class="amount expense">-320,000 Ft</p>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Egyenleg</h3>
+                            <p class="amount">+130,000 Ft</p>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Kategóriák szerinti megoszlás</h3>
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Havi trend</h3>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="tab-content">
+                <div class="settings-container">
+                    <h2>Beállítások</h2>
+                    
+                    <div class="settings-group">
+                        <h3>👥 Családtagok</h3>
+                        <div class="family-members">
+                            <div class="member-item">
+                                <input type="text" value="Férj" placeholder="Név">
+                                <select>
+                                    <option>OTP - ***4567</option>
+                                    <option>Revolut - ***8901</option>
+                                </select>
+                            </div>
+                            <div class="member-item">
+                                <input type="text" value="Feleség" placeholder="Név">
+                                <select>
+                                    <option>Raiffeisen - ***2345</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary">+ Családtag hozzáadása</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>🏷️ Kategóriák</h3>
+                        <div class="category-list">
+                            <div class="category-item">
+                                <span>🍔</span>
+                                <input type="text" value="Élelmiszer">
+                                <button class="btn-delete">❌</button>
+                            </div>
+                            <div class="category-item">
+                                <span>🚗</span>
+                                <input type="text" value="Közlekedés">
+                                <button class="btn-delete">❌</button>
+                            </div>
+                            <div class="category-item">
+                                <span>🏠</span>
+                                <input type="text" value="Rezsi">
+                                <button class="btn-delete">❌</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary">+ Kategória hozzáadása</button>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>💾 Adatok</h3>
+                        <button class="btn btn-primary">Exportálás CSV-be</button>
+                        <button class="btn btn-danger">Összes adat törlése</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>© 2024 Expense Tracker | Minden adat lokálisan tárolva | <a href="https://github.com/Csancus/expense-tracker" target="_blank">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
