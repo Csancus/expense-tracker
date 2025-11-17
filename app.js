@@ -64,33 +64,58 @@ class ExpenseTracker {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
 
+        // Remove any existing listeners first to prevent duplicates
+        const newUploadArea = uploadArea.cloneNode(true);
+        uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
+        const uploadAreaElement = document.getElementById('uploadArea');
+        
         // Drag and drop
-        uploadArea.addEventListener('dragover', (e) => {
+        uploadAreaElement.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('dragover');
+            e.stopPropagation();
+            uploadAreaElement.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+        uploadAreaElement.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadAreaElement.classList.remove('dragover');
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        uploadAreaElement.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('dragover');
+            e.stopPropagation();
+            uploadAreaElement.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 this.handleFile(files[0]);
             }
         });
 
-        // Click to upload
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
+        // Click to upload - use delegation to handle dynamic content
+        uploadAreaElement.addEventListener('click', (e) => {
+            // Check if we're in processing state
+            if (uploadAreaElement.querySelector('.processing-status')) {
+                return; // Don't trigger file dialog during processing
+            }
+            
+            // Check if click is on button or upload prompt
+            if (e.target.closest('.upload-prompt') || e.target.closest('.btn-primary')) {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput.click();
+            }
         });
 
-        fileInput.addEventListener('change', (e) => {
+        // File input change - remove old listener first
+        const newFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(newFileInput, fileInput);
+        
+        document.getElementById('fileInput').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 this.handleFile(e.target.files[0]);
+                // Clear the input so same file can be selected again
+                e.target.value = '';
             }
         });
     }
@@ -189,8 +214,8 @@ class ExpenseTracker {
         const uploadArea = document.getElementById('uploadArea');
         if (this.originalUploadContent) {
             uploadArea.innerHTML = this.originalUploadContent;
-            // Re-attach event listeners
-            this.setupUpload();
+            // Do NOT re-attach event listeners - they're already attached to the container
+            // The original event listeners are still there on the parent element
         }
     }
 
@@ -278,10 +303,14 @@ class ExpenseTracker {
     }
 
     showUploadStatus(count) {
-        const uploadArea = document.getElementById('uploadArea');
         const uploadStatus = document.getElementById('uploadStatus');
         const statusDetails = uploadStatus.querySelector('.status-details');
 
+        // First restore the upload area
+        this.restoreUploadArea();
+        
+        // Then show status
+        const uploadArea = document.getElementById('uploadArea');
         uploadArea.style.display = 'none';
         uploadStatus.style.display = 'block';
 
