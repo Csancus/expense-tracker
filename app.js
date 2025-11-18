@@ -98,24 +98,27 @@ class ExpenseTracker {
             }
         }, false);
 
-        // File input change event
+        // File input change event - clear after processing
         fileInput.addEventListener('change', (e) => {
             if (!this.isProcessing && e.target.files.length > 0) {
-                this.processFile(e.target.files[0]);
+                const file = e.target.files[0];
+                // Clear input immediately to prevent duplicate triggers
+                e.target.value = '';
+                this.processFile(file);
             }
         });
 
-        // Button click - use a specific button, not the whole area
-        const uploadButton = document.querySelector('#uploadArea .btn-primary');
-        if (uploadButton) {
-            uploadButton.addEventListener('click', (e) => {
+        // Use event delegation for button clicks to avoid multiple listeners
+        uploadArea.addEventListener('click', (e) => {
+            // Only respond to clicks on the upload button
+            if (e.target.classList.contains('btn-primary') || e.target.closest('.btn-primary')) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (!this.isProcessing) {
                     fileInput.click();
                 }
-            });
-        }
+            }
+        });
     }
 
     async processFile(file) {
@@ -152,8 +155,6 @@ class ExpenseTracker {
             // Always reset processing flag and UI
             this.isProcessing = false;
             this.resetUploadUI();
-            // Clear file input
-            document.getElementById('fileInput').value = '';
         }
     }
 
@@ -225,24 +226,14 @@ class ExpenseTracker {
         const uploadPrompt = uploadArea.querySelector('.upload-prompt');
         
         if (uploadPrompt) {
+            // Reset HTML without re-adding event listeners 
+            // (event delegation handles button clicks)
             uploadPrompt.innerHTML = `
                 <span class="upload-icon">📁</span>
                 <h3>Húzza ide a fájlt vagy kattintson a tallózáshoz</h3>
                 <p>Támogatott formátumok: CSV, PDF, Excel</p>
                 <button class="btn btn-primary">Fájl kiválasztása</button>
             `;
-            
-            // Re-attach button listener
-            const button = uploadPrompt.querySelector('.btn-primary');
-            if (button) {
-                button.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!this.isProcessing) {
-                        document.getElementById('fileInput').click();
-                    }
-                });
-            }
         }
     }
 
