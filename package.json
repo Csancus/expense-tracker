@@ -37,5 +37,23 @@
   "workspaces": [
     "frontend",
     "backend"
-  ]
+  ],
+  "main": "app-backup.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Csancus/expense-tracker.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Csancus/expense-tracker/issues"
+  },
+  "homepage": "https://github.com/Csancus/expense-tracker#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.83.0",
+    "dotenv": "^17.2.3"
+  }
 }
