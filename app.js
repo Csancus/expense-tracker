@@ -17,6 +17,7 @@ class ExpenseTracker {
         this.setupBankSelector();
         this.setupCategoryManagement();
         this.setupGroupListener();
+        this.setupThemeToggle();
         this.renderTransactions();
         this.renderAnalytics();
         this.renderCategories();
@@ -931,6 +932,33 @@ class ExpenseTracker {
         }
         
         return 'other';
+    }
+
+    setupThemeToggle() {
+        // Load saved theme or default to light
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        this.setTheme(savedTheme);
+
+        // Setup theme toggle button
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                this.setTheme(newTheme);
+            });
+        }
+    }
+
+    setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        
+        // Update theme toggle icon
+        const themeIcon = document.querySelector('.theme-icon');
+        if (themeIcon) {
+            themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+        }
     }
 }
 

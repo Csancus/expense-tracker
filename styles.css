@@ -20,6 +20,22 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
+/* Dark Mode Variables */
+[data-theme="dark"] {
+    --primary-color: #6366F1;
+    --primary-dark: #4F46E5;
+    --secondary-color: #10B981;
+    --danger-color: #F87171;
+    --warning-color: #FBBF24;
+    --bg-color: #111827;
+    --card-bg: #1F2937;
+    --text-primary: #F9FAFB;
+    --text-secondary: #D1D5DB;
+    --border-color: #374151;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     background: var(--bg-color);
@@ -45,6 +61,50 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-title {
+    flex: 1;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+.theme-icon {
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover .theme-icon {
+    transform: rotate(20deg);
 }
 
 .header h1 {
@@ -972,17 +1032,93 @@ body {
     }
 }
 
-/* Dark mode support for mobile */
+/* Dark Mode Enhancements */
+[data-theme="dark"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .transaction-item {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .nav-btn {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .nav-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+[data-theme="dark"] .bank-btn {
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .bank-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+[data-theme="dark"] .category-item {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .member-item {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .auth-card {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .auth-tab {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .auth-tab.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .offline-banner {
+    background: var(--warning-color);
+    color: var(--bg-color);
+}
+
+/* Auto dark mode support */
 @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme]) {
+        --primary-color: #6366F1;
+        --primary-dark: #4F46E5;
+        --secondary-color: #10B981;
+        --danger-color: #F87171;
+        --warning-color: #FBBF24;
         --bg-color: #111827;
         --card-bg: #1F2937;
         --text-primary: #F9FAFB;
-        --text-secondary: #9CA3AF;
+        --text-secondary: #D1D5DB;
         --border-color: #374151;
-    }
-    
-    .modal-overlay {
-        background: rgba(0, 0, 0, 0.8);
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
     }
 }
