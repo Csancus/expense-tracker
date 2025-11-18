@@ -198,72 +198,66 @@ class PDFProcessor {
     }
 
     parseOTPTransactionLine(line, allLines, lineIndex) {
-        // Skip lines that don't start with a date pattern (25.07.28)
-        const datePattern = /^(\d{2}\.\d{2}\.\d{2})/;
-        const dateMatch = line.match(datePattern);
+        const trimmedLine = line.trim();
         
-        if (!dateMatch) {
+        // Must start with date pattern 25.07.28
+        if (!/^\d{2}\.\d{2}\.\d{2}/.test(trimmedLine)) {
             return null;
         }
         
-        const bookingDate = dateMatch[1];
-        
-        // OTP 2025 format: 25.07.28 25.07.28 VÁSÁRLÁS KÁRTYÁVAL, 8460878289, 0000001300274868, Tranzakció: 25.07.24, GOOGLE *Google Play Ap -GOOGLE -2.714
-        
-        // Extract components
-        const parts = line.split(/\s+/);
-        
-        // Value date is usually the second date
-        const valueDate = parts.length > 1 && /^\d{2}\.\d{2}\.\d{2}$/.test(parts[1]) ? parts[1] : bookingDate;
-        
-        // Find the amount (negative or positive number, usually at the end)
-        let amount = 0;
-        let amountIndex = -1;
-        
-        // Look for amount pattern: -2.714, 448.599, -164, etc.
-        for (let j = parts.length - 1; j >= 0; j--) {
-            const part = parts[j];
-            // Match patterns like: -2.714, 448.599, -164
-            if (/^[-+]?\d+(?:\.\d{3})*(?:,\d{2})?$/.test(part)) {
-                amount = this.parseAmount(part);
-                amountIndex = j;
-                break;
-            }
+        // Skip balance lines
+        if (trimmedLine.includes('NYITÓ EGYENLEG') || trimmedLine.includes('ZÁRÓ EGYENLEG')) {
+            return null;
         }
         
-        // If no amount found, try to find it in the next line (EUR conversion case)
+        // Find the last number in the line (the amount)
+        const amountMatch = trimmedLine.match(/([-+]?\d+(?:\.\d{3})*(?:,\d{2})?)$/);
+        let amount = 0;
+        let description = trimmedLine;
+        
+        if (amountMatch) {
+            amount = this.parseAmount(amountMatch[1]);
+            // Remove amount from description
+            description = trimmedLine.substring(0, trimmedLine.lastIndexOf(amountMatch[1])).trim();
+        }
+        
+        // If no amount found in this line, might be EUR conversion - check next line
         if (amount === 0 && lineIndex + 1 < allLines.length) {
-            const nextLine = allLines[lineIndex + 1];
-            // Look for patterns like: "6,800EUR 0," followed by amount
-            const eurMatch = nextLine.match(/[\d,]+EUR\s+\d+,?\s*([-]?\d+(?:\.\d{3})*(?:,\d{2})?)/);
+            const nextLine = allLines[lineIndex + 1].trim();
+            const eurMatch = nextLine.match(/([-+]?\d+(?:\.\d{3})*(?:,\d{2})?)$/);
             if (eurMatch) {
                 amount = this.parseAmount(eurMatch[1]);
             }
         }
         
-        // Extract description (between value date and amount)
-        let description = '';
-        const startIndex = valueDate === bookingDate ? 2 : 3; // Skip booking date and value date
-        const endIndex = amountIndex > 0 ? amountIndex : parts.length;
-        
-        if (endIndex > startIndex) {
-            description = parts.slice(startIndex, endIndex).join(' ');
-        } else {
-            // Fallback: take everything after dates
-            description = parts.slice(startIndex).join(' ');
+        // Skip if no amount found
+        if (amount === 0) {
+            return null;
         }
         
-        // Clean up description
+        // Extract date (first date in the line)
+        const dateMatch = description.match(/^(\d{2}\.\d{2}\.\d{2})/);
+        if (!dateMatch) {
+            return null;
+        }
+        
+        const transactionDate = dateMatch[1];
+        
+        // Remove date(s) from description  
+        // Handle both single date (25.07.28) and double date (25.07.28 25.07.28)
+        description = description.replace(/^\d{2}\.\d{2}\.\d{2}(\s+\d{2}\.\d{2}\.\d{2})?\s+/, '');
+        
+        // Clean description
         description = this.cleanOTPDescription(description);
         
-        // Skip if we couldn't extract meaningful data
+        // Skip if no meaningful description left
         if (!description || description.length < 3) {
             return null;
         }
         
         return {
             id: Date.now() + Math.random(),
-            date: this.parseOTPDate(bookingDate),
+            date: this.parseOTPDate(transactionDate),
             merchant: this.extractOTPMerchant(description),
             description: description,
             amount: amount,
