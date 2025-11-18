@@ -154,14 +154,8 @@ class PDFProcessor {
         const transactions = [];
         const lines = text.split('\n');
         
-        // OTP PDF format patterns
-        const datePattern = /(\d{4}[\.\/\-]\d{2}[\.\/\-]\d{2})/;
-        const amountPattern = /([\-\+]?\s*[\d\s]+[,\.]\d{2})/;
-        const balancePattern = /egyenleg.*?([\d\s]+[,\.]\d{2})/i;
-        
-        // State variables for parsing
-        let currentTransaction = null;
-        let isInTransactionSection = false;
+        // Find transaction section
+        let inTransactionSection = false;
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -169,93 +163,187 @@ class PDFProcessor {
             // Skip empty lines
             if (!line) continue;
             
-            // Detect transaction section start
-            if (line.includes('Tranzakciók') || line.includes('Könyvelés dátuma') || 
-                line.includes('Értéknap') || line.includes('Terhelés') || line.includes('Jóváírás')) {
-                isInTransactionSection = true;
+            // Start of transaction section
+            if (line.includes('FORGALMAK') || line.includes('KÖNYVELÉS/ÉRTÉKNAP')) {
+                inTransactionSection = true;
                 continue;
             }
             
-            // Skip if not in transaction section yet
-            if (!isInTransactionSection) continue;
+            // End of transaction section
+            if (inTransactionSection && (
+                line.includes('IDÕSZAK:') || 
+                line.includes('JÓVÁÍRÁSOK ÖSSZESEN:') || 
+                line.includes('TERHELÉSEK ÖSSZESEN:') ||
+                line.includes('LAP/LAP')
+            )) {
+                break;
+            }
             
-            // Try to parse transaction line
-            // OTP format: Date | Description | Debit/Credit | Balance
-            const dateMatch = line.match(datePattern);
+            // Skip header lines
+            if (line.includes('MEGNEVEZÉS') || line.includes('ÖSSZEG') || line.includes('NYITÓ EGYENLEG')) {
+                continue;
+            }
             
-            if (dateMatch) {
-                // Save previous transaction if exists
-                if (currentTransaction && currentTransaction.amount !== 0) {
-                    transactions.push(currentTransaction);
-                }
-                
-                // Start new transaction
-                currentTransaction = {
-                    date: this.parseDate(dateMatch[1]),
-                    description: '',
-                    amount: 0,
-                    balance: null,
-                    raw: line
-                };
-                
-                // Extract description and amount from the same line
-                const afterDate = line.substring(line.indexOf(dateMatch[1]) + dateMatch[1].length).trim();
-                
-                // Look for amount patterns
-                const amounts = afterDate.match(/[\-\+]?\s*[\d\s]+[,\.]\d{2}/g);
-                if (amounts && amounts.length > 0) {
-                    // Last amount is usually the balance, second to last is the transaction amount
-                    const amountStr = amounts[amounts.length > 1 ? amounts.length - 2 : 0];
-                    currentTransaction.amount = this.parseAmount(amountStr);
-                    
-                    if (amounts.length > 1) {
-                        currentTransaction.balance = this.parseAmount(amounts[amounts.length - 1]);
-                    }
-                    
-                    // Extract description (everything between date and first amount)
-                    const firstAmountIndex = afterDate.indexOf(amounts[0]);
-                    if (firstAmountIndex > 0) {
-                        currentTransaction.description = afterDate.substring(0, firstAmountIndex).trim();
-                    }
-                } else {
-                    // No amount found on this line, description might continue on next line
-                    currentTransaction.description = afterDate;
-                }
-            } else if (currentTransaction && !datePattern.test(line)) {
-                // Continuation of previous transaction description
-                const amountMatch = line.match(amountPattern);
-                if (amountMatch) {
-                    if (currentTransaction.amount === 0) {
-                        currentTransaction.amount = this.parseAmount(amountMatch[1]);
-                    }
-                    // Get description before amount
-                    const beforeAmount = line.substring(0, line.indexOf(amountMatch[1])).trim();
-                    if (beforeAmount) {
-                        currentTransaction.description += ' ' + beforeAmount;
-                    }
-                } else {
-                    // Just description continuation
-                    currentTransaction.description += ' ' + line;
+            // Parse transaction line if in section
+            if (inTransactionSection) {
+                const transaction = this.parseOTPTransactionLine(line, lines, i);
+                if (transaction) {
+                    transactions.push(transaction);
                 }
             }
         }
         
-        // Don't forget the last transaction
-        if (currentTransaction && currentTransaction.amount !== 0) {
-            transactions.push(currentTransaction);
+        console.log(`Parsed ${transactions.length} OTP transactions`);
+        return transactions;
+    }
+
+    parseOTPTransactionLine(line, allLines, lineIndex) {
+        // Skip lines that don't start with a date pattern (25.07.28)
+        const datePattern = /^(\d{2}\.\d{2}\.\d{2})/;
+        const dateMatch = line.match(datePattern);
+        
+        if (!dateMatch) {
+            return null;
         }
         
-        // Post-process transactions
-        return transactions.map(t => ({
+        const bookingDate = dateMatch[1];
+        
+        // OTP 2025 format: 25.07.28 25.07.28 VÁSÁRLÁS KÁRTYÁVAL, 8460878289, 0000001300274868, Tranzakció: 25.07.24, GOOGLE *Google Play Ap -GOOGLE -2.714
+        
+        // Extract components
+        const parts = line.split(/\s+/);
+        
+        // Value date is usually the second date
+        const valueDate = parts.length > 1 && /^\d{2}\.\d{2}\.\d{2}$/.test(parts[1]) ? parts[1] : bookingDate;
+        
+        // Find the amount (negative or positive number, usually at the end)
+        let amount = 0;
+        let amountIndex = -1;
+        
+        // Look for amount pattern: -2.714, 448.599, -164, etc.
+        for (let j = parts.length - 1; j >= 0; j--) {
+            const part = parts[j];
+            // Match patterns like: -2.714, 448.599, -164
+            if (/^[-+]?\d+(?:\.\d{3})*(?:,\d{2})?$/.test(part)) {
+                amount = this.parseAmount(part);
+                amountIndex = j;
+                break;
+            }
+        }
+        
+        // If no amount found, try to find it in the next line (EUR conversion case)
+        if (amount === 0 && lineIndex + 1 < allLines.length) {
+            const nextLine = allLines[lineIndex + 1];
+            // Look for patterns like: "6,800EUR 0," followed by amount
+            const eurMatch = nextLine.match(/[\d,]+EUR\s+\d+,?\s*([-]?\d+(?:\.\d{3})*(?:,\d{2})?)/);
+            if (eurMatch) {
+                amount = this.parseAmount(eurMatch[1]);
+            }
+        }
+        
+        // Extract description (between value date and amount)
+        let description = '';
+        const startIndex = valueDate === bookingDate ? 2 : 3; // Skip booking date and value date
+        const endIndex = amountIndex > 0 ? amountIndex : parts.length;
+        
+        if (endIndex > startIndex) {
+            description = parts.slice(startIndex, endIndex).join(' ');
+        } else {
+            // Fallback: take everything after dates
+            description = parts.slice(startIndex).join(' ');
+        }
+        
+        // Clean up description
+        description = this.cleanOTPDescription(description);
+        
+        // Skip if we couldn't extract meaningful data
+        if (!description || description.length < 3) {
+            return null;
+        }
+        
+        return {
             id: Date.now() + Math.random(),
-            date: t.date,
-            merchant: this.extractMerchant(t.description),
-            description: this.cleanDescription(t.description),
-            amount: t.amount,
-            balance: t.balance,
-            category: this.suggestCategory(t.description),
+            date: this.parseOTPDate(bookingDate),
+            merchant: this.extractOTPMerchant(description),
+            description: description,
+            amount: amount,
+            category: this.suggestCategory(description),
             bank: 'OTP'
-        }));
+        };
+    }
+
+    parseOTPDate(otpDate) {
+        // Convert 25.07.28 to 2025-07-28
+        const parts = otpDate.split('.');
+        if (parts.length === 3) {
+            const year = '20' + parts[0]; // 25 -> 2025
+            const month = parts[1];
+            const day = parts[2];
+            return `${year}-${month}-${day}`;
+        }
+        return otpDate;
+    }
+
+    cleanOTPDescription(description) {
+        // Remove common OTP patterns
+        let cleaned = description;
+        
+        // Remove card transaction prefixes
+        cleaned = cleaned.replace(/^VÁSÁRLÁS KÁRTYÁVAL,\s*\d+,\s*\d+,\s*Tranzakció:\s*\d{2}\.\d{2}\.\d{2},\s*/, '');
+        
+        // Remove bank transfer prefixes
+        cleaned = cleaned.replace(/^NAPKÖZBENI ÁTUTALÁS,\s*[^,]*,\s*[^,]*,\s*/, '');
+        
+        // Remove donation prefixes
+        cleaned = cleaned.replace(/^ADOMÁNY,\s*[^,]*,\s*[^,]*,\s*[^,]*,\s*/, '');
+        
+        // Remove trailing EUR amounts and codes
+        cleaned = cleaned.replace(/\s+\d+,\d+EUR.*$/, '');
+        cleaned = cleaned.replace(/\s+-[A-Z]+.*$/, ''); // Remove -GOOGLE, -ÉRINTŐ etc.
+        
+        // Clean up extra spaces
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        return cleaned;
+    }
+
+    extractOTPMerchant(description) {
+        // Extract merchant name from OTP description
+        let merchant = description;
+        
+        // Handle special cases
+        if (merchant.includes('GOOGLE *Google Play')) {
+            return 'Google Play';
+        }
+        if (merchant.includes('PAYPAL *')) {
+            const paypalMatch = merchant.match(/PAYPAL \*([^*]+)/);
+            return paypalMatch ? paypalMatch[1].trim() : 'PayPal';
+        }
+        if (merchant.includes('LIDL ÁRUHÁZ')) {
+            return 'LIDL';
+        }
+        if (merchant.includes('OTPdirekt HAVIDÍJ')) {
+            return 'OTP Díj';
+        }
+        if (merchant.includes('COGNIZANT TECHNOLOGY')) {
+            return 'Fizetés (Cognizant)';
+        }
+        if (merchant.includes('WWF Magyarország')) {
+            return 'WWF Adomány';
+        }
+        if (merchant.includes('Revolut**')) {
+            return 'Revolut';
+        }
+        
+        // Take first meaningful words
+        const words = merchant.split(' ');
+        const meaningfulWords = words.filter(word => 
+            word.length > 2 && 
+            !word.match(/^\d+$/) && 
+            !word.includes('*')
+        );
+        
+        return meaningfulWords.slice(0, 2).join(' ') || words[0] || 'Ismeretlen';
     }
 
     parseRaiffeisenStatement(text) {
