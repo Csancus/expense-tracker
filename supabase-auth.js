@@ -24,11 +24,12 @@ class SupabaseAuth {
         }
 
         try {
-            // Get Supabase configuration from environment
-            const supabaseUrl = this.getEnvVar('SUPABASE_URL') || 'YOUR_SUPABASE_URL';
-            const supabaseKey = this.getEnvVar('SUPABASE_ANON_KEY') || 'YOUR_SUPABASE_ANON_KEY';
+            // Get Supabase configuration from meta tags or fallback to hardcoded
+            const supabaseUrl = this.getEnvVar('SUPABASE_URL') || 'https://pdmaznyyartrrstliewke.supabase.co';
+            const supabaseKey = this.getEnvVar('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbWF6bnl5YXJ0cnN0bGlld2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NDUzMDAsImV4cCI6MjA3OTAyMTMwMH0.lRR78pV6NPSZa-pDrqOUPFK7gPBfWb6DqMAZKwNmX-A';
             
-            if (supabaseUrl.includes('YOUR_SUPABASE') || supabaseKey.includes('YOUR_SUPABASE')) {
+            // Validate configuration
+            if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('YOUR_SUPABASE')) {
                 console.log('Supabase not configured, using offline mode');
                 this.isOffline = true;
                 this.setupOfflineMode();

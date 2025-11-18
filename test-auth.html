@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test - Expense Tracker</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #3B82F6;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover { background: #2563EB; }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Expense Tracker - Auth Test</h1>
+    
+    <div class="test-card">
+        <h2>1. Supabase Connection Test</h2>
+        <button onclick="testConnection()">Test Connection</button>
+        <div id="connection-status"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>2. Registration Test</h2>
+        <input type="email" id="reg-email" placeholder="Email" value="test@example.com">
+        <input type="password" id="reg-password" placeholder="Password" value="Test123456!">
+        <button onclick="testRegistration()">Register</button>
+        <div id="registration-status"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>3. Login Test</h2>
+        <input type="email" id="login-email" placeholder="Email" value="test@example.com">
+        <input type="password" id="login-password" placeholder="Password" value="Test123456!">
+        <button onclick="testLogin()">Login</button>
+        <div id="login-status"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>4. Current User</h2>
+        <button onclick="checkUser()">Check Current User</button>
+        <button onclick="logout()">Logout</button>
+        <div id="user-status"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>5. Database Test</h2>
+        <button onclick="testDatabase()">Test Database Operations</button>
+        <div id="database-status"></div>
+    </div>
+
+    <div class="test-card">
+        <h2>Console Output</h2>
+        <pre id="console-output"></pre>
+    </div>
+
+    <!-- Load Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        // Configuration
+        const SUPABASE_URL = 'https://pdmaznyyartrrstliewke.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbWF6bnl5YXJ0cnN0bGlld2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NDUzMDAsImV4cCI6MjA3OTAyMTMwMH0.lRR78pV6NPSZa-pDrqOUPFK7gPBfWb6DqMAZKwNmX-A';
+        
+        let supabase = null;
+        
+        function log(message, type = 'info') {
+            const output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            console.log(message);
+        }
+        
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        // Initialize Supabase
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            log('✅ Supabase client initialized');
+        } catch (error) {
+            log('❌ Failed to initialize Supabase: ' + error.message, 'error');
+        }
+        
+        async function testConnection() {
+            try {
+                log('Testing Supabase connection...');
+                const { data, error } = await supabase.from('categories').select('count');
+                
+                if (error && error.code !== 'PGRST116') {
+                    throw error;
+                }
+                
+                showStatus('connection-status', 
+                    '✅ Connected to Supabase successfully!', 
+                    'success'
+                );
+                log('✅ Connection successful');
+            } catch (error) {
+                showStatus('connection-status', 
+                    `❌ Connection failed: ${error.message}`, 
+                    'error'
+                );
+                log('❌ Connection error: ' + error.message);
+            }
+        }
+        
+        async function testRegistration() {
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            
+            try {
+                log(`Registering user: ${email}...`);
+                
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        emailRedirectTo: window.location.origin
+                    }
+                });
+                
+                if (error) throw error;
+                
+                showStatus('registration-status', 
+                    `✅ Registration successful! Check email: ${email}`, 
+                    'success'
+                );
+                log(`✅ User registered: ${data.user?.email}`);
+                log('Note: Email confirmation may be required');
+                
+            } catch (error) {
+                showStatus('registration-status', 
+                    `❌ Registration failed: ${error.message}`, 
+                    'error'
+                );
+                log('❌ Registration error: ' + error.message);
+            }
+        }
+        
+        async function testLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                log(`Logging in as: ${email}...`);
+                
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) throw error;
+                
+                showStatus('login-status', 
+                    `✅ Login successful! User: ${data.user?.email}`, 
+                    'success'
+                );
+                log(`✅ Logged in: ${data.user?.email}`);
+                log(`Session token: ${data.session?.access_token?.substring(0, 20)}...`);
+                
+            } catch (error) {
+                showStatus('login-status', 
+                    `❌ Login failed: ${error.message}`, 
+                    'error'
+                );
+                log('❌ Login error: ' + error.message);
+            }
+        }
+        
+        async function checkUser() {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    showStatus('user-status', 
+                        `✅ Logged in as: ${user.email} (ID: ${user.id})`, 
+                        'success'
+                    );
+                    log(`Current user: ${user.email}`);
+                    log(`User ID: ${user.id}`);
+                    log(`Created: ${user.created_at}`);
+                } else {
+                    showStatus('user-status', 
+                        '⚠️ No user logged in', 
+                        'warning'
+                    );
+                    log('No active session');
+                }
+            } catch (error) {
+                showStatus('user-status', 
+                    `❌ Error: ${error.message}`, 
+                    'error'
+                );
+                log('❌ User check error: ' + error.message);
+            }
+        }
+        
+        async function logout() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                
+                showStatus('user-status', 
+                    '✅ Logged out successfully', 
+                    'success'
+                );
+                log('✅ User logged out');
+            } catch (error) {
+                showStatus('user-status', 
+                    `❌ Logout failed: ${error.message}`, 
+                    'error'
+                );
+                log('❌ Logout error: ' + error.message);
+            }
+        }
+        
+        async function testDatabase() {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (!user) {
+                    showStatus('database-status', 
+                        '⚠️ Please login first', 
+                        'warning'
+                    );
+                    return;
+                }
+                
+                log('Testing database operations...');
+                
+                // Test 1: List categories
+                log('1. Fetching categories...');
+                const { data: categories, error: catError } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('user_id', user.id);
+                    
+                if (catError) throw catError;
+                log(`   Found ${categories?.length || 0} categories`);
+                
+                // Test 2: Create a test category
+                log('2. Creating test category...');
+                const { data: newCat, error: createError } = await supabase
+                    .from('categories')
+                    .insert({
+                        user_id: user.id,
+                        name: `Test Category ${Date.now()}`,
+                        emoji: '🧪',
+                        color: '#3B82F6'
+                    })
+                    .select()
+                    .single();
+                    
+                if (createError) throw createError;
+                log(`   Created category: ${newCat.name}`);
+                
+                // Test 3: List transactions
+                log('3. Fetching transactions...');
+                const { data: transactions, error: txError } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .limit(10);
+                    
+                if (txError && txError.code !== 'PGRST116') throw txError;
+                log(`   Found ${transactions?.length || 0} transactions`);
+                
+                showStatus('database-status', 
+                    '✅ All database operations successful!', 
+                    'success'
+                );
+                log('✅ Database tests completed');
+                
+            } catch (error) {
+                showStatus('database-status', 
+                    `❌ Database test failed: ${error.message}`, 
+                    'error'
+                );
+                log('❌ Database error: ' + error.message);
+            }
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            log('Page loaded - Expense Tracker Auth Test');
+            log(`Supabase URL: ${SUPABASE_URL}`);
+            log(`Supabase initialized: ${supabase !== null}`);
+            checkUser();
+        });
+    </script>
+</body>
+</html>
