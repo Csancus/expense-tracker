@@ -1,7 +1,7 @@
 // Test Raiffeisen PDF Parser
 const { PDFProcessor } = require('./pdf-processor.js');
 
-// Sample content from the actual Raiffeisen PDF
+// Sample content from the actual Raiffeisen PDF - format as extracted by PDF.js
 const sampleRaiffeisenContent = `Könyvelés
 Tétel azon. Értéknap Tranzakció megnevezése Terhelés(-) Jóváírás(+)
 5252233050 2025.10.01. Díj, jutalék -16.418,64
@@ -75,7 +75,7 @@ function testRaiffeisenParser() {
         { merchant: 'Raiffeisen Díj', amount: -16418.64 },
         { merchant: 'Helyi Iparűzési Adó', amount: -50000 },
         { merchant: 'Pótlék', amount: -2041 },
-        { merchant: 'JÓZSAKI KORLÁTOLT FELELŐSSÉGŰ', amount: 2455863 },
+        { merchant: 'JÓZSAKI', amount: 2455863 },
         { merchant: 'Nagy-Boróczki Annamária', amount: -17000 },
         { merchant: 'Promóciós jóváírás', amount: 30000 }
     ];

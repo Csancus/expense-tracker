@@ -1,243 +1,150 @@
-# Supabase Setup Útmutató
+# Supabase Setup Guide - Expense Tracker
 
-## 1. Supabase Projekt Létrehozása
+## 🚀 Quick Setup (5 perc)
 
-1. Menj a [supabase.com](https://supabase.com) oldalra
-2. Kattints a "Start your project" gombra
-3. Jelentkezz be GitHub fiókkal vagy email/jelszóval
-4. Hozz létre új projektet:
-   - **Project name**: `expense-tracker`
-   - **Database password**: Generálj biztonságos jelszót
-   - **Region**: `Europe (EU West)` - Frankfurt (GDPR compliance)
+### 1. Supabase Project létrehozása
 
-## 2. Adatbázis Séma Beállítása
+1. Menj a [Supabase Dashboard](https://app.supabase.com)-ra
+2. Kattints a "New project" gombra
+3. Válaszd ki a szervezeted vagy hozz létre újat
+4. Add meg a projekt adatait:
+   - **Name**: expense-tracker
+   - **Database Password**: Erős jelszó (mentsd el!)
+   - **Region**: Europe (eu-west-1) - közelebb van hozzánk
+   - **Pricing Plan**: FREE
+5. Kattints "Create new project"
+6. Várj 2-3 percet amíg a projekt felépül
 
-1. A projekt dashboard-ban menj a **SQL Editor** részhez
-2. Hozz létre új query-t és másold be a következő SQL-t:
+### 2. Adatbázis séma létrehozása
 
-```sql
--- Költségkategóriák
-CREATE TABLE categories (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    emoji TEXT,
-    color TEXT DEFAULT '#6B7280',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+1. A Supabase Dashboard-ban menj a **SQL Editor** tabra
+2. Kattints "New query"
+3. Másold be a teljes tartalmat a `supabase/schema.sql` fájlból
+4. Kattints "Run" a séma létrehozásához
+5. Ellenőrizd hogy minden tábla létrejött a **Table Editor**-ban
 
--- Kategória szabályok (időszak alapú)
-CREATE TABLE category_rules (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    category_id UUID REFERENCES categories(id) ON DELETE CASCADE,
-    merchant_pattern TEXT NOT NULL,
-    start_date DATE,
-    end_date DATE,
-    priority INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+### 3. API kulcsok beszerzése
 
--- Tranzakciók
-CREATE TABLE transactions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    merchant TEXT NOT NULL,
-    description TEXT,
-    amount DECIMAL(12,2) NOT NULL,
-    category_id UUID REFERENCES categories(id),
-    bank TEXT,
-    reference TEXT,
-    memo TEXT,
-    hash TEXT UNIQUE, -- duplikátum ellenőrzéshez
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+1. Menj a **Settings** > **API** tabra
+2. Másold ki ezeket az értékeket:
+   - **Project URL** (pl. `https://abcdefg.supabase.co`)
+   - **anon public key** (hosszú szöveg, `eyJ...` kezdődik)
 
--- Bankfájl feltöltések
-CREATE TABLE file_uploads (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    filename TEXT NOT NULL,
-    bank TEXT NOT NULL,
-    file_hash TEXT NOT NULL,
-    transactions_count INTEGER DEFAULT 0,
-    upload_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+### 4. Frontend konfiguráció
 
--- Row Level Security engedélyezése
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE category_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE file_uploads ENABLE ROW LEVEL SECURITY;
+#### Opció A: Meta tag-ek (egyszerű)
+Szúrd be ezeket a `<head>` részbe az `index.html`-ben:
 
--- RLS Policies - csak saját adatokat látja/szerkesztheti a felhasználó
-CREATE POLICY "Users can manage their own categories" ON categories
-    FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can manage their own category rules" ON category_rules
-    FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can manage their own transactions" ON transactions
-    FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can manage their own uploads" ON file_uploads
-    FOR ALL USING (auth.uid() = user_id);
-
--- Alapértelmezett kategóriák beszúrása (minden felhasználóhoz)
-CREATE OR REPLACE FUNCTION create_default_categories()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO categories (user_id, name, emoji, color) VALUES
-        (NEW.id, 'Élelmiszer', '🍔', '#EF4444'),
-        (NEW.id, 'Közlekedés', '🚗', '#F59E0B'),
-        (NEW.id, 'Rezsi', '🏠', '#10B981'),
-        (NEW.id, 'Vásárlás', '🛍️', '#3B82F6'),
-        (NEW.id, 'Szórakozás', '🎬', '#8B5CF6'),
-        (NEW.id, 'Egészség', '🏥', '#EC4899'),
-        (NEW.id, 'Egyéb', '📌', '#6B7280');
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger az alapértelmezett kategóriákhoz
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION create_default_categories();
-```
-
-3. Futtasd a query-t a "Run" gombbal
-
-## 3. Autentikáció Konfigurálása
-
-1. Menj az **Authentication** → **Settings** részhez
-2. **Site URL** beállítása:
-   - Development: `http://localhost:3000` vagy `http://localhost:8080`
-   - Production: `https://csancus.github.io/expense-tracker`
-
-3. **Redirect URLs** hozzáadása:
-   - `http://localhost:3000/**`
-   - `https://csancus.github.io/expense-tracker/**`
-
-4. **OAuth Providers** beállítása (opcionális):
-   - Google: Engedélyezd és állítsd be OAuth credentials
-   - Más providers igény szerint
-
-## 4. API Kulcsok Megszerzése
-
-1. Menj a **Settings** → **API** részhez
-2. Másold ki a következő értékeket:
-   - **Project URL**: `https://your-project-id.supabase.co`
-   - **Anon key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
-
-## 5. Frontend Konfiguráció
-
-### Opció 1: Environment Variables (ajánlott production-höz)
-Hozz létre `.env` fájlt:
-```bash
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-### Opció 2: Meta Tags (GitHub Pages)
-Add hozzá az index.html head részéhez:
 ```html
-<meta name="SUPABASE_URL" content="https://your-project-id.supabase.co">
+<meta name="SUPABASE_URL" content="https://your-project.supabase.co">
 <meta name="SUPABASE_ANON_KEY" content="your-anon-key-here">
 ```
 
-### Opció 3: JavaScript Variables
-Hozz létre `config.js` fájlt:
-```javascript
-window.SUPABASE_URL = 'https://your-project-id.supabase.co';
-window.SUPABASE_ANON_KEY = 'your-anon-key-here';
-```
+#### Opció B: JavaScript változók
+Vagy add hozzá ezt a script tag-et:
 
-## 6. Email Templates (opcionális)
-
-1. Menj az **Authentication** → **Email Templates** részhez
-2. Customize-old az email template-eket magyarra:
-
-**Confirm signup template:**
 ```html
-<h2>Erősítse meg regisztrációját</h2>
-<p>Kattintson az alábbi linkre a regisztráció véglegesítéséhez:</p>
-<p><a href="{{ .ConfirmationURL }}">Email megerősítése</a></p>
+<script>
+  window.SUPABASE_URL = 'https://your-project.supabase.co';
+  window.SUPABASE_ANON_KEY = 'your-anon-key-here';
+</script>
 ```
 
-## 7. Storage Beállítása (PDF feltöltéshez)
+### 5. Script tag-ek hozzáadása
 
-1. Menj a **Storage** részhez
-2. Hozz létre új bucket-et: `bank-statements`
-3. Állítsd be a policies-t:
+Frissítsd az index.html-t ezekkel a script tag-ekkel:
 
-```sql
--- Storage policy fájl feltöltéshez
-CREATE POLICY "Users can upload their own files" ON storage.objects
-    FOR INSERT WITH CHECK (bucket_id = 'bank-statements' AND auth.uid()::text = (storage.foldername(name))[1]);
-
-CREATE POLICY "Users can view their own files" ON storage.objects
-    FOR SELECT USING (bucket_id = 'bank-statements' AND auth.uid()::text = (storage.foldername(name))[1]);
-
-CREATE POLICY "Users can delete their own files" ON storage.objects
-    FOR DELETE USING (bucket_id = 'bank-statements' AND auth.uid()::text = (storage.foldername(name))[1]);
+```html
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- App Scripts -->
+<script src="supabase-client.js?v=1"></script>
+<script src="supabase-auth.js?v=1"></script>
+<script src="app.js?v=1"></script>
 ```
 
-## 8. Testing
+## ✅ Tesztelés
 
 1. Nyisd meg az alkalmazást
-2. Regisztrálj új fiókkal
-3. Ellenőrizd az email-ed és erősítsd meg
-4. Próbáld ki a bejelentkezést
-5. Tölts fel bankszámlakivonatot
+2. Próbálj regisztrálni egy új fiókkal
+3. Ellenőrizd hogy megkapod-e a megerősítő emailt
+4. Jelentkezz be
+5. Töltsd fel egy bank kivonatot
+6. Ellenőrizd hogy az adatok megjelennek a Supabase Dashboard-on
 
-## 9. Production Deploy
+## 🎯 Főbb szolgáltatások
 
-### GitHub Pages
-1. Add hozzá a Supabase config-ot meta tag-ekben
-2. Commit és push GitHub-ra
-3. Engedélyezd GitHub Pages-t
-4. Frissítsd a Supabase redirect URL-eket
+### Amit kapsz a FREE tier-rel:
+- ✅ 50,000 MAU (Monthly Active Users)
+- ✅ 500 MB adatbázis tárhely
+- ✅ 1 GB file storage (bank kivonatok)
+- ✅ 5 GB forgalom havonta
+- ✅ Korlátlan API hívások
+- ✅ Email authentication
+- ✅ Google OAuth (ha beállítod)
+- ✅ Row Level Security (RLS)
+- ✅ Realtime sync
+- ✅ Automatic backups
 
-### Vercel/Netlify
-1. Állítsd be environment variables-t
-2. Deploy a projektet
-3. Frissítsd Supabase URL konfigurációt
+### Automatikus funkciók:
+- 🤖 **Auto-kategorizálás**: A tranzakciók automatikusan kategorizálódnak a szabályok alapján
+- 🔄 **Realtime sync**: Az adatok azonnal szinkronizálódnak az eszközök között
+- 🔐 **Biztonság**: Minden felhasználó csak saját adatait látja (RLS)
+- 📧 **Email megerősítés**: Biztonságos regisztráció
+- 📱 **Offline fallback**: Ha nincs internet, localStorage-ban tárol
 
-## 10. Monitoring & Analytics
+## 🛠️ Fejlett beállítások
 
-1. **Database**: Supabase Dashboard → SQL Editor
-2. **Auth**: Authentication → Users
-3. **Storage**: Storage → bank-statements
-4. **Logs**: Logs & Reports
+### Google OAuth engedélyezése:
+1. **Authentication** > **Providers** > **Google**
+2. Add meg a Google Client ID és Secret-et
+3. Authorized redirect URLs: `https://your-project.supabase.co/auth/v1/callback`
 
-## Troubleshooting
+### Storage bucket beállítása:
+1. **Storage** > **Buckets**
+2. Az "uploads" bucket automatikusan létrejött
+3. Itt fognak tárolódni a feltöltött fájlok
 
-### Gyakori hibák:
+### Email template testreszabása:
+1. **Authentication** > **Email Templates**
+2. Testreszabhatod az email sablonokat
 
-1. **"Invalid JWT"**: Ellenőrizd az API key-t
-2. **"Row Level Security"**: Ellenőrizd a policies-t
-3. **CORS hiba**: Ellenőrizd az allowed origins-t
-4. **Email nem érkezik**: Ellenőrizd spam folder-t
+## 🐛 Hibaelhárítás
 
-### Debug módba kapcsolás:
-```javascript
-// Konzolban:
-localStorage.debug = 'supabase:*'
-```
+### "Invalid API key" hiba:
+- Ellenőrizd hogy jó API kulcsot másoltad
+- Ellenőrizd hogy a projekt URL helyes
 
-## Költségek
+### "Row Level Security" hiba:
+- Futtasd le újra a schema.sql-t
+- Ellenőrizd hogy a policies létrejöttek
 
-- **Ingyenes tier**: 500MB DB, 50MB storage, 50,000 monthly active users
-- **Pro ($25/hó)**: 8GB DB, 100GB storage, 100,000 MAU
-- **Team ($599/hó)**: Dedikált erőforrások, priority support
+### Offline mode marad:
+- Ellenőrizd a browser console-t hibákért
+- Ellenőrizd hogy a meta tag-ek helyesek
+- Próbáld meg frissíteni az oldalt
 
-## Biztonsági Javaslatok
+## 💡 Tippek
 
-1. **API kulcsok**: Soha ne commitoljd a repo-ba
-2. **RLS**: Mindig enabled legyen
-3. **HTTPS**: Kötelező minden környezetben  
-4. **Email verification**: Enabled legyen
-5. **Password policy**: Erős jelszó követelmények
+1. **Fejlesztés**: Használd a browser dev tools-t a hibák nyomon követésére
+2. **Adatok**: A Supabase Dashboard-on láthatod az élő adatokat
+3. **Backup**: A FREE tier-nél is van automatic backup
+4. **Monitoring**: A Dashboard-on láthatod a usage statistics-ot
+5. **Upgrade**: Ha kinövöd a FREE tier-t, $25/hó a Pro plan
+
+## 🔄 Migrálás localStorage-ról
+
+Ha már van adat localStorage-ban, az automatikusan át fog szinkronizálódni első bejelentkezéskor. Az adatok mindkét helyen megmaradnak, így nem veszítesz semmit.
+
+---
+
+**Költség összegzés:**
+- Fejlesztés: **FREE** ✅
+- Kis user base (~1000 user): **FREE** ✅ 
+- Közepes használat: **$25/hó** (Pro plan)
+
+**Időigény:**
+- Supabase setup: 5 perc
+- Frontend config: 2 perc
+- Tesztelés: 3 perc
+- **Összesen: ~10 perc** 🚀

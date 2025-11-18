@@ -1,7 +1,7 @@
-// PocketBase Authentication & Database Integration
-class ExpenseAuth {
+// Supabase Authentication for Expense Tracker
+class SupabaseAuth {
     constructor() {
-        this.pb = null;
+        this.client = null;
         this.user = null;
         this.isInitialized = false;
         this.isOffline = false;
@@ -15,55 +15,59 @@ class ExpenseAuth {
     }
 
     async init() {
-        // Check if PocketBase is available (CDN loaded)
-        if (typeof window.PocketBase === 'undefined') {
-            console.log('PocketBase not loaded, using offline mode');
+        // Check if Supabase is available (CDN loaded)
+        if (typeof window.supabase === 'undefined') {
+            console.log('Supabase not loaded, using offline mode');
             this.isOffline = true;
             this.setupOfflineMode();
             return;
         }
 
         try {
-            // Initialize PocketBase client  
-            // Update this URL to your Railway deployment URL
-            const POCKETBASE_URL = 'https://expense-tracker-production.railway.app';
+            // Get Supabase configuration from environment
+            const supabaseUrl = this.getEnvVar('SUPABASE_URL') || 'YOUR_SUPABASE_URL';
+            const supabaseKey = this.getEnvVar('SUPABASE_ANON_KEY') || 'YOUR_SUPABASE_ANON_KEY';
             
-            // Use environment variables if available, fallback to configured URL
-            const pocketbaseUrl = this.getEnvVar('POCKETBASE_URL') || POCKETBASE_URL;
-            
-            if (pocketbaseUrl.includes('your-app') || pocketbaseUrl.includes('localhost')) {
-                console.log('PocketBase not configured, using offline mode');
+            if (supabaseUrl.includes('YOUR_SUPABASE') || supabaseKey.includes('YOUR_SUPABASE')) {
+                console.log('Supabase not configured, using offline mode');
                 this.isOffline = true;
                 this.setupOfflineMode();
                 return;
             }
 
-            this.pb = new window.PocketBase(pocketbaseUrl);
+            // Initialize Supabase client
+            this.client = new SupabaseClient();
+            const success = await this.client.init(supabaseUrl, supabaseKey);
             
-            // Check if user is already authenticated
-            if (this.pb.authStore.isValid) {
-                this.user = this.pb.authStore.model;
+            if (!success) {
+                throw new Error('Supabase initialization failed');
+            }
+
+            // Listen to auth state changes
+            window.addEventListener('authStateChanged', (event) => {
+                const { user, event: authEvent } = event.detail;
+                this.user = user;
+                
+                if (user) {
+                    this.showApp();
+                    this.syncDataToCloud();
+                } else {
+                    this.showAuth();
+                }
+            });
+
+            // Check current session
+            if (this.client.isAuthenticated()) {
+                this.user = this.client.getCurrentUser();
                 this.showApp();
             } else {
                 this.showAuth();
             }
 
-            // Subscribe to auth changes
-            this.pb.authStore.onChange(() => {
-                if (this.pb.authStore.isValid) {
-                    this.user = this.pb.authStore.model;
-                    this.showApp();
-                    this.syncDataToCloud();
-                } else {
-                    this.user = null;
-                    this.showAuth();
-                }
-            });
-
             this.isInitialized = true;
             
         } catch (error) {
-            console.error('PocketBase initialization failed:', error);
+            console.error('Supabase initialization failed:', error);
             this.isOffline = true;
             this.setupOfflineMode();
         }
@@ -145,8 +149,6 @@ class ExpenseAuth {
         document.body.classList.add('has-offline-banner');
     }
 
-    // PocketBase doesn't need this method as it uses onChange instead
-
     showAuth() {
         const app = document.querySelector('.app');
         if (app) {
@@ -220,11 +222,11 @@ class ExpenseAuth {
                         </div>
                         <div class="form-group">
                             <label>Jelszó:</label>
-                            <input type="password" id="signupPassword" required>
+                            <input type="password" id="signupPassword" required minlength="6">
                         </div>
                         <div class="form-group">
                             <label>Jelszó megerősítése:</label>
-                            <input type="password" id="signupPasswordConfirm" required>
+                            <input type="password" id="signupPasswordConfirm" required minlength="6">
                         </div>
                         <button type="submit" class="btn btn-primary">Regisztráció</button>
                     </form>
@@ -299,10 +301,10 @@ class ExpenseAuth {
         const password = document.getElementById('signinPassword').value;
 
         try {
-            await this.pb.collection('users').authWithPassword(email, password);
-            // Auth store will automatically trigger onChange
+            await this.client.signIn(email, password);
+            // Auth state change will be handled by event listener
         } catch (error) {
-            this.showAuthError(this.getPocketBaseErrorMessage(error));
+            this.showAuthError(this.getSupabaseErrorMessage(error));
         }
     }
 
@@ -318,23 +320,16 @@ class ExpenseAuth {
             return;
         }
 
-        try {
-            // Create user account
-            const userData = {
-                email,
-                password,
-                passwordConfirm: confirmPassword,
-                emailVisibility: true
-            };
+        if (password.length < 6) {
+            this.showAuthError('A jelszó legalább 6 karakter hosszú legyen');
+            return;
+        }
 
-            await this.pb.collection('users').create(userData);
-            
-            // Request email verification
-            await this.pb.collection('users').requestVerification(email);
-            
+        try {
+            await this.client.signUp(email, password);
             this.showAuthError('Regisztráció sikeres! Ellenőrizze email fiókját a megerősítéshez.', false);
         } catch (error) {
-            this.showAuthError(this.getPocketBaseErrorMessage(error));
+            this.showAuthError(this.getSupabaseErrorMessage(error));
         }
     }
 
@@ -342,30 +337,32 @@ class ExpenseAuth {
         if (this.isOffline) return this.startDemoMode();
 
         try {
-            // PocketBase OAuth flow
-            const authData = await this.pb.collection('users').authWithOAuth2('google');
-            // Auth will be handled by onChange
+            await this.client.signInWithGoogle();
+            // Auth state change will be handled by event listener
         } catch (error) {
             this.showAuthError('Google bejelentkezés sikertelen');
         }
     }
 
-    getPocketBaseErrorMessage(error) {
-        // Extract user-friendly message from PocketBase error
-        if (error?.response?.data) {
-            const data = error.response.data;
-            if (data.email) return 'Érvénytelen email cím';
-            if (data.password) return 'Jelszó túl rövid (min. 8 karakter)';
-            if (data.message) return data.message;
-        }
-        
+    getSupabaseErrorMessage(error) {
+        // Extract user-friendly message from Supabase error
         if (error?.message) {
-            if (error.message.includes('Failed to authenticate')) {
+            if (error.message.includes('Invalid login credentials')) {
                 return 'Hibás email cím vagy jelszó';
             }
-            if (error.message.includes('Failed to create')) {
+            if (error.message.includes('User already registered')) {
                 return 'Ez az email cím már regisztrált';
             }
+            if (error.message.includes('Password should be')) {
+                return 'A jelszó túl rövid (min. 6 karakter)';
+            }
+            if (error.message.includes('Unable to validate email address')) {
+                return 'Érvénytelen email cím';
+            }
+            if (error.message.includes('Email not confirmed')) {
+                return 'Kérjük, erősítse meg email címét';
+            }
+            return error.message;
         }
         
         return 'Hiba történt a kérés során';
@@ -381,20 +378,26 @@ class ExpenseAuth {
     showUserInfo() {
         const header = document.querySelector('.header-content');
         if (header && this.user) {
+            // Remove existing user info
+            const existingUserInfo = header.querySelector('.user-info');
+            if (existingUserInfo) {
+                existingUserInfo.remove();
+            }
+            
             const userInfo = document.createElement('div');
             userInfo.className = 'user-info';
             userInfo.innerHTML = `
                 <span>👋 ${this.user.email}</span>
-                <button class="btn-logout" onclick="auth.signOut()">Kijelentkezés</button>
+                <button class="btn-logout" onclick="supabaseAuth.signOut()">Kijelentkezés</button>
             `;
             header.appendChild(userInfo);
         }
     }
 
     async signOut() {
-        if (!this.isOffline && this.pb) {
-            this.pb.authStore.clear();
-            // onChange will trigger automatically
+        if (!this.isOffline && this.client) {
+            await this.client.signOut();
+            // Auth state change will be handled by event listener
         } else {
             this.user = null;
             this.showAuth();
@@ -403,83 +406,58 @@ class ExpenseAuth {
 
     showAuthError(message, isError = true) {
         const errorDiv = document.getElementById('authError');
-        errorDiv.textContent = message;
-        errorDiv.className = `auth-error ${isError ? 'error' : 'success'}`;
-        errorDiv.style.display = 'block';
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.className = `auth-error ${isError ? 'error' : 'success'}`;
+            errorDiv.style.display = 'block';
+        }
     }
 
     hideAuthError() {
         const errorDiv = document.getElementById('authError');
-        errorDiv.style.display = 'none';
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
     }
 
     async syncDataToCloud() {
-        if (this.isOffline || !this.pb || !this.user) return;
+        if (this.isOffline || !this.client || !this.user) return;
 
         try {
             // Get local data
             const localTransactions = JSON.parse(localStorage.getItem('expense_transactions') || '[]');
             const localCategories = JSON.parse(localStorage.getItem('expense_categories') || '[]');
+            const localRules = JSON.parse(localStorage.getItem('expense_category_rules') || '[]');
             
-            if (localTransactions.length > 0) {
-                console.log('Syncing transactions to PocketBase...');
-                
-                // Create default categories if they don't exist
-                await this.ensureDefaultCategories();
-                
-                // Sync transactions
-                for (const transaction of localTransactions) {
-                    try {
-                        await this.pb.collection('transactions').create({
-                            ...transaction,
-                            user_id: this.user.id
-                        });
-                    } catch (error) {
-                        if (!error.message.includes('duplicate')) {
-                            console.error('Transaction sync failed:', error);
-                        }
-                    }
-                }
-                
+            if (localTransactions.length > 0 || localCategories.length > 0 || localRules.length > 0) {
+                console.log('Syncing local data to Supabase...');
+                await this.client.syncLocalData(localCategories, localTransactions, localRules);
                 console.log('Data sync completed');
+                
+                // Clear local data after successful sync (optional)
+                // localStorage.removeItem('expense_transactions');
+                // localStorage.removeItem('expense_categories');
+                // localStorage.removeItem('expense_category_rules');
             }
         } catch (error) {
             console.error('Data sync failed:', error);
         }
     }
 
-    async ensureDefaultCategories() {
-        try {
-            // Check if user has categories
-            const existingCategories = await this.pb.collection('categories').getList(1, 1, {
-                filter: `user_id="${this.user.id}"`
-            });
+    // Utility methods
+    isAuthenticated() {
+        return this.user !== null;
+    }
 
-            if (existingCategories.totalItems === 0) {
-                // Create default categories
-                const defaultCategories = [
-                    { name: 'Élelmiszer', emoji: '🍔', color: '#EF4444' },
-                    { name: 'Közlekedés', emoji: '🚗', color: '#F59E0B' },
-                    { name: 'Rezsi', emoji: '🏠', color: '#10B981' },
-                    { name: 'Vásárlás', emoji: '🛍️', color: '#3B82F6' },
-                    { name: 'Szórakozás', emoji: '🎬', color: '#8B5CF6' },
-                    { name: 'Egészség', emoji: '🏥', color: '#EC4899' },
-                    { name: 'Egyéb', emoji: '📌', color: '#6B7280' }
-                ];
+    getCurrentUser() {
+        return this.user;
+    }
 
-                for (const category of defaultCategories) {
-                    await this.pb.collection('categories').create({
-                        ...category,
-                        user_id: this.user.id
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Failed to create default categories:', error);
-        }
+    getClient() {
+        return this.client;
     }
 }
 
 // Initialize auth system
-const auth = new ExpenseAuth();
-window.auth = auth;
+const supabaseAuth = new SupabaseAuth();
+window.supabaseAuth = supabaseAuth;

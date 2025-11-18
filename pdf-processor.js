@@ -380,7 +380,7 @@ class PDFProcessor {
             
             if (inTransactionSection) {
                 // Look for transaction ID line (starts with numbers)
-                const transactionMatch = line.match(/^(\d{10})\s+(\d{4}\.\d{2}\.\d{2}\.)\s+(.+?)(?:\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?))?\s*$/);
+                const transactionMatch = line.match(/^(\d{10})\s+(\d{4}\.\d{2}\.\d{2}\.)\s+(.+?)$/);
                 
                 if (transactionMatch) {
                     // Complete previous transaction if exists
@@ -391,24 +391,34 @@ class PDFProcessor {
                         }
                     }
                     
+                    // Extract amount from the end of the line if present
+                    const description = transactionMatch[3].trim();
+                    const amountMatch = description.match(/^(.+?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?)$/);
+                    
                     // Start new transaction
                     currentTransaction = {
                         id: transactionMatch[1],
                         date: transactionMatch[2],
-                        description: transactionMatch[3].trim(),
-                        amount: transactionMatch[4] ? this.parseAmount(transactionMatch[4]) : null,
+                        description: amountMatch ? amountMatch[1].trim() : description,
+                        amount: amountMatch ? this.parseAmount(amountMatch[2]) : null,
                         additionalInfo: []
                     };
                 } else if (currentTransaction) {
                     // Look for value date line
-                    const valueDateMatch = line.match(/^(\d{4}\.\d{2}\.\d{2}\.)\s+(.+?)(?:\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?))?\s*$/);
+                    const valueDateMatch = line.match(/^(\d{4}\.\d{2}\.\d{2}\.)\s+(.+)$/);
                     if (valueDateMatch && !currentTransaction.valueDate) {
                         currentTransaction.valueDate = valueDateMatch[1];
-                        if (valueDateMatch[3] && !currentTransaction.amount) {
-                            currentTransaction.amount = this.parseAmount(valueDateMatch[3]);
-                        }
-                        if (valueDateMatch[2].trim()) {
-                            currentTransaction.additionalInfo.push(valueDateMatch[2].trim());
+                        
+                        const valueDescription = valueDateMatch[2].trim();
+                        const amountMatch = valueDescription.match(/^(.+?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?)$/);
+                        
+                        if (amountMatch && !currentTransaction.amount) {
+                            currentTransaction.amount = this.parseAmount(amountMatch[2]);
+                            if (amountMatch[1].trim()) {
+                                currentTransaction.additionalInfo.push(amountMatch[1].trim());
+                            }
+                        } else if (valueDescription && !amountMatch) {
+                            currentTransaction.additionalInfo.push(valueDescription);
                         }
                     } else {
                         // Additional info lines
@@ -427,10 +437,10 @@ class PDFProcessor {
                             currentTransaction.additionalInfo.push(line);
                         }
                         
-                        // Look for amount in continuation lines
-                        const amountMatch = line.match(/(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*$/);
-                        if (amountMatch && !currentTransaction.amount) {
-                            currentTransaction.amount = this.parseAmount(amountMatch[1]);
+                        // Look for standalone amount lines
+                        const standaloneAmountMatch = line.match(/^(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*$/);
+                        if (standaloneAmountMatch && !currentTransaction.amount) {
+                            currentTransaction.amount = this.parseAmount(standaloneAmountMatch[1]);
                         }
                     }
                 }
@@ -625,8 +635,19 @@ class PDFProcessor {
     parseAmount(amountStr) {
         if (!amountStr) return 0;
         
-        // Remove spaces and convert comma to dot
-        amountStr = amountStr.replace(/\s/g, '').replace(',', '.');
+        // Hungarian number format: 1.234.567,89 
+        // Remove spaces first
+        amountStr = amountStr.replace(/\s/g, '');
+        
+        // Check if it has both dots and comma (Hungarian format)
+        if (amountStr.includes('.') && amountStr.includes(',')) {
+            // Remove thousand separators (dots) and convert decimal comma to dot
+            amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+        } else if (amountStr.includes(',')) {
+            // Only comma, treat as decimal separator
+            amountStr = amountStr.replace(',', '.');
+        }
+        // If only dots, assume it's thousand separators for whole numbers
         
         // Parse as float
         const amount = parseFloat(amountStr);

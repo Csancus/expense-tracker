@@ -1,0 +1,472 @@
+{
+  "settings": {
+    "meta": {
+      "appName": "Expense Tracker",
+      "appUrl": "https://csancus.github.io/expense-tracker"
+    },
+    "logs": {
+      "maxDays": 7
+    },
+    "smtp": {
+      "enabled": false,
+      "host": "",
+      "port": 587,
+      "username": "",
+      "password": "",
+      "authMethod": "",
+      "tls": true,
+      "localName": ""
+    },
+    "s3": {
+      "enabled": false
+    },
+    "adminAuthToken": {
+      "duration": 1209600
+    },
+    "adminPasswordResetToken": {
+      "duration": 1800
+    },
+    "recordAuthToken": {
+      "duration": 1209600
+    },
+    "recordPasswordResetToken": {
+      "duration": 1800
+    },
+    "recordEmailChangeToken": {
+      "duration": 1800
+    },
+    "recordVerificationToken": {
+      "duration": 604800
+    }
+  },
+  "collections": [
+    {
+      "id": "categories",
+      "name": "categories",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "id": "user_id",
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "_pb_users_auth_",
+            "cascadeDelete": true,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["email"]
+          }
+        },
+        {
+          "id": "name",
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 100,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "emoji",
+          "name": "emoji",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 10,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "color",
+          "name": "color",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": 7,
+            "max": 7,
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_categories_user_id ON categories (user_id)"
+      ],
+      "listRule": "@request.auth.id = user_id",
+      "viewRule": "@request.auth.id = user_id",
+      "createRule": "@request.auth.id = user_id",
+      "updateRule": "@request.auth.id = user_id",
+      "deleteRule": "@request.auth.id = user_id",
+      "options": {}
+    },
+    {
+      "id": "category_rules",
+      "name": "category_rules",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "id": "user_id",
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "_pb_users_auth_",
+            "cascadeDelete": true,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["email"]
+          }
+        },
+        {
+          "id": "category_id",
+          "name": "category_id",
+          "type": "relation",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "categories",
+            "cascadeDelete": true,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["name"]
+          }
+        },
+        {
+          "id": "merchant_pattern",
+          "name": "merchant_pattern",
+          "type": "text",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 200,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "start_date",
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "id": "end_date",
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "id": "priority",
+          "name": "priority",
+          "type": "number",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": 0,
+            "max": null,
+            "noDecimal": true
+          }
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_category_rules_user_id ON category_rules (user_id)",
+        "CREATE INDEX idx_category_rules_pattern ON category_rules (merchant_pattern)"
+      ],
+      "listRule": "@request.auth.id = user_id",
+      "viewRule": "@request.auth.id = user_id",
+      "createRule": "@request.auth.id = user_id",
+      "updateRule": "@request.auth.id = user_id",
+      "deleteRule": "@request.auth.id = user_id",
+      "options": {}
+    },
+    {
+      "id": "transactions",
+      "name": "transactions",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "id": "user_id",
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "_pb_users_auth_",
+            "cascadeDelete": true,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["email"]
+          }
+        },
+        {
+          "id": "date",
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "id": "merchant",
+          "name": "merchant",
+          "type": "text",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 200,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "description",
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 1000,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "amount",
+          "name": "amount",
+          "type": "number",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": null,
+            "noDecimal": false
+          }
+        },
+        {
+          "id": "category_id",
+          "name": "category_id",
+          "type": "relation",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "categories",
+            "cascadeDelete": false,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["name"]
+          }
+        },
+        {
+          "id": "bank",
+          "name": "bank",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 50,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "reference",
+          "name": "reference",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 200,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "memo",
+          "name": "memo",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 500,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "hash",
+          "name": "hash",
+          "type": "text",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": null,
+            "max": 200,
+            "pattern": ""
+          }
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_transaction_hash ON transactions (hash) WHERE hash != ''",
+        "CREATE INDEX idx_transactions_user_date ON transactions (user_id, date DESC)",
+        "CREATE INDEX idx_transactions_category ON transactions (category_id)",
+        "CREATE INDEX idx_transactions_bank ON transactions (bank)"
+      ],
+      "listRule": "@request.auth.id = user_id",
+      "viewRule": "@request.auth.id = user_id",
+      "createRule": "@request.auth.id = user_id",
+      "updateRule": "@request.auth.id = user_id",
+      "deleteRule": "@request.auth.id = user_id",
+      "options": {}
+    },
+    {
+      "id": "file_uploads",
+      "name": "file_uploads",
+      "type": "base",
+      "system": false,
+      "schema": [
+        {
+          "id": "user_id",
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "collectionId": "_pb_users_auth_",
+            "cascadeDelete": true,
+            "minSelect": null,
+            "maxSelect": 1,
+            "displayFields": ["email"]
+          }
+        },
+        {
+          "id": "filename",
+          "name": "filename",
+          "type": "text",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 300,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "bank",
+          "name": "bank",
+          "type": "text",
+          "required": true,
+          "presentable": true,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 50,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "file_hash",
+          "name": "file_hash",
+          "type": "text",
+          "required": true,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": 1,
+            "max": 200,
+            "pattern": ""
+          }
+        },
+        {
+          "id": "transactions_count",
+          "name": "transactions_count",
+          "type": "number",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "min": 0,
+            "max": null,
+            "noDecimal": true
+          }
+        },
+        {
+          "id": "file",
+          "name": "file",
+          "type": "file",
+          "required": false,
+          "presentable": false,
+          "unique": false,
+          "options": {
+            "maxSelect": 1,
+            "maxSize": 10485760,
+            "mimeTypes": [
+              "application/pdf",
+              "text/csv",
+              "application/vnd.ms-excel",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.template"
+            ],
+            "thumbs": null,
+            "protected": false
+          }
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_file_hash ON file_uploads (file_hash)",
+        "CREATE INDEX idx_uploads_user_date ON file_uploads (user_id, created DESC)"
+      ],
+      "listRule": "@request.auth.id = user_id",
+      "viewRule": "@request.auth.id = user_id",
+      "createRule": "@request.auth.id = user_id",
+      "updateRule": "@request.auth.id = user_id",
+      "deleteRule": "@request.auth.id = user_id",
+      "options": {}
+    }
+  ]
+}

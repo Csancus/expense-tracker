@@ -148,7 +148,7 @@ class ExpenseTracker {
                 await this.processPDFFile(file);
             } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || 
                        file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
-                alert('Excel feldolgozás hamarosan elérhető lesz.');
+                await this.processExcelFile(file);
             } else {
                 await this.processCSVFile(file);
             }
@@ -186,10 +186,44 @@ class ExpenseTracker {
         }
     }
 
+    async processExcelFile(file) {
+        this.showProcessingStatus('Excel feldolgozás folyamatban...');
+
+        // Check if ExcelProcessor exists
+        if (typeof ExcelProcessor === 'undefined') {
+            // Try to load it
+            await this.loadExcelProcessor();
+        }
+
+        if (typeof ExcelProcessor === 'undefined') {
+            throw new Error('Excel feldolgozó nem elérhető');
+        }
+
+        const excelProcessor = new ExcelProcessor();
+        const transactions = await excelProcessor.processExcel(file, this.selectedBank);
+
+        if (transactions && transactions.length > 0) {
+            this.addTransactions(transactions);
+            this.showSuccess(transactions.length);
+        } else {
+            alert('Nem találtunk tranzakciókat az Excel fájlban.');
+        }
+    }
+
     async loadPDFProcessor() {
         return new Promise((resolve) => {
             const script = document.createElement('script');
             script.src = 'pdf-processor.js?v=' + Date.now();
+            script.onload = () => resolve();
+            script.onerror = () => resolve(); // Continue even if fails
+            document.head.appendChild(script);
+        });
+    }
+
+    async loadExcelProcessor() {
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'excel-processor.js?v=' + Date.now();
             script.onload = () => resolve();
             script.onerror = () => resolve(); // Continue even if fails
             document.head.appendChild(script);
