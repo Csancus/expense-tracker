@@ -25,7 +25,7 @@ class SupabaseAuth {
 
         try {
             // Get Supabase configuration from meta tags or fallback to hardcoded
-            const supabaseUrl = this.getEnvVar('SUPABASE_URL') || 'https://pdmaznyyartrrstliewke.supabase.co';
+            const supabaseUrl = this.getEnvVar('SUPABASE_URL') || 'https://pdmaznyyartrstliewke.supabase.co';
             const supabaseKey = this.getEnvVar('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbWF6bnl5YXJ0cnN0bGlld2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NDUzMDAsImV4cCI6MjA3OTAyMTMwMH0.lRR78pV6NPSZa-pDrqOUPFK7gPBfWb6DqMAZKwNmX-A';
             
             // Validate configuration
