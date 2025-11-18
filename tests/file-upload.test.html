@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Test - Expense Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .test-pending {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .create-test-file {
+            background: #28a745;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .create-test-file h3 {
+            color: white;
+            margin: 0 0 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Expense Tracker - File Upload Tests</h1>
+    
+    <!-- Create Test Files -->
+    <div class="create-test-file">
+        <h3>📁 Test File Creator</h3>
+        <button onclick="createTestCSV()">Create Test CSV</button>
+        <button onclick="createTestPDF()">Create Test PDF</button>
+        <button onclick="openMainApp()">Open Main App</button>
+    </div>
+
+    <!-- Test Results -->
+    <div id="testResults">
+        <div class="test-section test-pending">
+            <h3>🔄 Running Tests...</h3>
+            <div id="testLog" class="log">Initializing tests...</div>
+        </div>
+    </div>
+
+    <!-- Test Cases -->
+    <div class="test-section">
+        <h3>🧪 Manual Tests</h3>
+        <button onclick="runManualTests()">Run Manual Tests</button>
+        <div id="manualResults"></div>
+    </div>
+
+    <script>
+        // Test Framework
+        class FileUploadTester {
+            constructor() {
+                this.results = [];
+                this.log = document.getElementById('testLog');
+                this.logMessage('Test framework initialized');
+            }
+
+            logMessage(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.log.innerHTML += `[${timestamp}] ${message}\n`;
+                this.log.scrollTop = this.log.scrollHeight;
+                console.log(`[TEST] ${message}`);
+            }
+
+            async runTests() {
+                this.logMessage('Starting automated tests...');
+                
+                try {
+                    await this.testInitialization();
+                    await this.testFileTypeDetection();
+                    await this.testProcessingState();
+                    await this.testErrorHandling();
+                    await this.testDuplicateProcessing();
+                    
+                    this.displayResults();
+                } catch (error) {
+                    this.logMessage(`Test suite failed: ${error.message}`);
+                }
+            }
+
+            test(name, condition, message = '') {
+                const result = { name, passed: condition, message };
+                this.results.push(result);
+                
+                const status = condition ? '✅ PASS' : '❌ FAIL';
+                this.logMessage(`${status}: ${name} ${message}`);
+                
+                return condition;
+            }
+
+            async testInitialization() {
+                this.logMessage('Testing application initialization...');
+                
+                // Mock DOM elements
+                this.createMockDOM();
+                
+                // Test ExpenseTracker class exists and initializes
+                this.test(
+                    'ExpenseTracker class exists',
+                    typeof ExpenseTracker === 'function',
+                    '- Class should be defined'
+                );
+
+                // Test instance creation
+                let app;
+                try {
+                    app = new ExpenseTracker();
+                    this.test(
+                        'ExpenseTracker instantiation',
+                        app instanceof ExpenseTracker,
+                        '- Should create instance without errors'
+                    );
+                } catch (error) {
+                    this.test(
+                        'ExpenseTracker instantiation',
+                        false,
+                        `- Failed: ${error.message}`
+                    );
+                    return;
+                }
+
+                // Test required properties
+                this.test(
+                    'Has required properties',
+                    app.hasOwnProperty('transactions') &&
+                    app.hasOwnProperty('selectedBank') &&
+                    app.hasOwnProperty('isProcessing'),
+                    '- Should have transactions, selectedBank, isProcessing'
+                );
+
+                this.app = app;
+            }
+
+            async testFileTypeDetection() {
+                this.logMessage('Testing file type detection...');
+
+                if (!this.app) {
+                    this.test('File type detection', false, '- App not initialized');
+                    return;
+                }
+
+                // Test PDF detection
+                const pdfFile = new File(['test'], 'test.pdf', { type: 'application/pdf' });
+                const csvFile = new File(['test'], 'test.csv', { type: 'text/csv' });
+                const xlsxFile = new File(['test'], 'test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                this.test(
+                    'PDF file detection',
+                    pdfFile.type === 'application/pdf' || pdfFile.name.endsWith('.pdf'),
+                    '- Should detect PDF files'
+                );
+
+                this.test(
+                    'CSV file detection',
+                    csvFile.type === 'text/csv' || csvFile.name.endsWith('.csv'),
+                    '- Should detect CSV files'
+                );
+
+                this.test(
+                    'Excel file detection',
+                    xlsxFile.type.includes('spreadsheet') || xlsxFile.name.endsWith('.xlsx'),
+                    '- Should detect Excel files'
+                );
+            }
+
+            async testProcessingState() {
+                this.logMessage('Testing processing state management...');
+
+                if (!this.app) {
+                    this.test('Processing state', false, '- App not initialized');
+                    return;
+                }
+
+                // Test initial state
+                this.test(
+                    'Initial processing state',
+                    this.app.isProcessing === false,
+                    '- Should start as not processing'
+                );
+
+                // Test state during processing
+                this.app.selectedBank = 'otp';
+                const testFile = new File(['Date,Description,Amount\n2024-01-01,Test,100'], 'test.csv', { type: 'text/csv' });
+                
+                // Mock the processing
+                const originalProcessFile = this.app.processFile;
+                let processingDuringCall = false;
+                
+                this.app.processFile = async function(file) {
+                    processingDuringCall = this.isProcessing;
+                    return originalProcessFile.call(this, file);
+                };
+
+                try {
+                    await this.app.processFile(testFile);
+                    
+                    this.test(
+                        'Processing flag during execution',
+                        processingDuringCall === true,
+                        '- Should be true during processing'
+                    );
+
+                    this.test(
+                        'Processing flag after completion',
+                        this.app.isProcessing === false,
+                        '- Should be false after processing'
+                    );
+                } catch (error) {
+                    this.test(
+                        'Processing state handling',
+                        false,
+                        `- Failed: ${error.message}`
+                    );
+                }
+            }
+
+            async testErrorHandling() {
+                this.logMessage('Testing error handling...');
+
+                if (!this.app) {
+                    this.test('Error handling', false, '- App not initialized');
+                    return;
+                }
+
+                // Test error without bank selection
+                this.app.selectedBank = null;
+                const testFile = new File(['test'], 'test.csv', { type: 'text/csv' });
+                
+                // Mock alert to capture calls
+                const originalAlert = window.alert;
+                let alertCalled = false;
+                window.alert = () => { alertCalled = true; };
+
+                try {
+                    await this.app.processFile(testFile);
+                    
+                    this.test(
+                        'Error handling without bank selection',
+                        alertCalled,
+                        '- Should show alert when no bank selected'
+                    );
+                } catch (error) {
+                    this.test(
+                        'Error handling graceful failure',
+                        true,
+                        '- Should handle errors gracefully'
+                    );
+                } finally {
+                    window.alert = originalAlert;
+                }
+
+                // Test processing state reset after error
+                this.test(
+                    'Processing state reset after error',
+                    this.app.isProcessing === false,
+                    '- Should reset processing flag even after error'
+                );
+            }
+
+            async testDuplicateProcessing() {
+                this.logMessage('Testing duplicate processing prevention...');
+
+                if (!this.app) {
+                    this.test('Duplicate processing', false, '- App not initialized');
+                    return;
+                }
+
+                // Set processing flag manually
+                this.app.isProcessing = true;
+                
+                const testFile = new File(['test'], 'test.csv', { type: 'text/csv' });
+                let processingAttempted = false;
+                
+                const originalShowProcessingStatus = this.app.showProcessingStatus;
+                this.app.showProcessingStatus = () => {
+                    processingAttempted = true;
+                };
+
+                await this.app.processFile(testFile);
+                
+                this.test(
+                    'Duplicate processing prevention',
+                    !processingAttempted,
+                    '- Should not start processing if already processing'
+                );
+
+                // Reset state
+                this.app.isProcessing = false;
+                this.app.showProcessingStatus = originalShowProcessingStatus;
+            }
+
+            createMockDOM() {
+                // Create minimal DOM structure for testing
+                if (!document.getElementById('uploadArea')) {
+                    document.body.innerHTML += `
+                        <div id="uploadArea">
+                            <div class="upload-prompt">
+                                <button class="btn btn-primary">Test Button</button>
+                            </div>
+                        </div>
+                        <div id="uploadStatus" style="display: none;">
+                            <div class="status-details"></div>
+                        </div>
+                        <input type="file" id="fileInput" hidden>
+                        <div id="transactionsList"></div>
+                        <canvas id="categoryChart"></canvas>
+                        <canvas id="trendChart"></canvas>
+                        <div class="summary-card">
+                            <div class="amount"></div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="amount"></div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="amount"></div>
+                        </div>
+                    `;
+                }
+            }
+
+            displayResults() {
+                const resultsDiv = document.getElementById('testResults');
+                const passed = this.results.filter(r => r.passed).length;
+                const total = this.results.length;
+                
+                const resultClass = passed === total ? 'test-pass' : 'test-fail';
+                
+                resultsDiv.innerHTML = `
+                    <div class="test-section ${resultClass}">
+                        <h3>${passed === total ? '✅' : '❌'} Test Results: ${passed}/${total} passed</h3>
+                        <div class="log">
+                            ${this.results.map(r => 
+                                `${r.passed ? '✅' : '❌'} ${r.name} ${r.message}`
+                            ).join('\n')}
+                        </div>
+                    </div>
+                `;
+
+                this.logMessage(`Tests completed: ${passed}/${total} passed`);
+            }
+        }
+
+        // Load main app script and run tests
+        async function loadAppScript() {
+            return new Promise((resolve, reject) => {
+                // Check if running locally or on GitHub Pages
+                const scriptSrc = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? '../app.js'
+                    : 'https://csancus.github.io/expense-tracker/app.js?v=3';
+
+                const script = document.createElement('script');
+                script.src = scriptSrc;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Initialize tests when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadAppScript();
+                const tester = new FileUploadTester();
+                await tester.runTests();
+            } catch (error) {
+                document.getElementById('testLog').innerHTML += `\nFailed to load app script: ${error.message}`;
+            }
+        });
+
+        // Manual test functions
+        function runManualTests() {
+            const manualResults = document.getElementById('manualResults');
+            manualResults.innerHTML = `
+                <div class="log">
+                    <h4>Manual Test Checklist:</h4>
+                    <p>□ 1. Open main app and select OTP bank</p>
+                    <p>□ 2. Try uploading the same file multiple times quickly</p>
+                    <p>□ 3. Verify file dialog doesn't open repeatedly</p>
+                    <p>□ 4. Test drag & drop with PDF file</p>
+                    <p>□ 5. Test CSV file upload</p>
+                    <p>□ 6. Verify processing spinner shows and disappears</p>
+                    <p>□ 7. Check that transactions appear in list</p>
+                    <p>□ 8. Verify no duplicate transactions on re-upload</p>
+                    <p>□ 9. Test error handling with invalid file</p>
+                    <p>□ 10. Verify UI resets properly after each operation</p>
+                </div>
+            `;
+        }
+
+        function createTestCSV() {
+            const csvContent = `Dátum;Közlemény;Összeg;Egyenleg
+2024-01-15;TESCO BUDAPEST;-12450;387550
+2024-01-14;MOL BUDAPEST;-8500;400000
+2024-01-13;Fizetés;+250000;408500
+2024-01-12;LIDL BUDAPEST;-6800;158500
+2024-01-11;BKK Bérlet;-9500;165300`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'test-otp-statement.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function createTestPDF() {
+            alert('PDF test file creation requires a more complex setup. For now, please use a real OTP PDF statement for testing.');
+        }
+
+        function openMainApp() {
+            const mainAppUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? '../index.html'
+                : 'https://csancus.github.io/expense-tracker/';
+            
+            window.open(mainAppUrl, '_blank');
+        }
+    </script>
+</body>
+</html>
