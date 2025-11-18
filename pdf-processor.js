@@ -465,26 +465,25 @@ class PDFProcessor {
     suggestCategory(description) {
         const desc = description.toLowerCase();
         
-        // Category mapping based on keywords
+        // Category mapping based on keywords - now returns category IDs
         const categoryMap = {
-            '🍔 Élelmiszer': ['tesco', 'lidl', 'aldi', 'spar', 'auchan', 'penny', 'coop', 'cba', 'élelmiszer', 'pékség', 'hentes', 'zöldség'],
-            '🚗 Közlekedés': ['mol', 'omv', 'shell', 'benzin', 'dízel', 'bkk', 'máv', 'volán', 'parkolás', 'útdíj'],
-            '🏠 Rezsi': ['elmű', 'elmu', 'émász', 'emasz', 'főtáv', 'fotav', 'vízmű', 'vizmu', 'digi', 'telekom', 'vodafone', 'yettel'],
-            '🛍️ Vásárlás': ['h&m', 'zara', 'media markt', 'ikea', 'decathlon', 'euronics', 'douglas', 'dm', 'rossmann', 'műszaki'],
-            '🎬 Szórakozás': ['cinema', 'mozi', 'színház', 'szinhaz', 'netflix', 'spotify', 'koncert', 'fesztivál'],
-            '🏥 Egészség': ['gyógyszertár', 'gyogyszert', 'patika', 'kórház', 'korhaz', 'orvos', 'fogorvos', 'optika'],
-            '🍽️ Étterem': ['étterem', 'restaurant', 'kávé', 'kave', 'cafe', 'büfé', 'bufe', 'pizz', 'gyors', 'mcdonald', 'burger', 'kebab']
+            'food': ['tesco', 'lidl', 'aldi', 'spar', 'auchan', 'penny', 'coop', 'cba', 'élelmiszer', 'pékség', 'hentes', 'zöldség'],
+            'transport': ['mol', 'omv', 'shell', 'benzin', 'dízel', 'bkk', 'máv', 'volán', 'parkolás', 'útdíj'],
+            'utilities': ['elmű', 'elmu', 'émász', 'emasz', 'főtáv', 'fotav', 'vízmű', 'vizmu', 'digi', 'telekom', 'vodafone', 'yettel'],
+            'shopping': ['h&m', 'zara', 'media markt', 'ikea', 'decathlon', 'euronics', 'douglas', 'dm', 'rossmann', 'műszaki'],
+            'entertainment': ['cinema', 'mozi', 'színház', 'szinhaz', 'netflix', 'spotify', 'koncert', 'fesztivál'],
+            'health': ['gyógyszertár', 'gyogyszert', 'patika', 'kórház', 'korhaz', 'orvos', 'fogorvos', 'optika']
         };
         
-        for (const [category, keywords] of Object.entries(categoryMap)) {
+        for (const [categoryId, keywords] of Object.entries(categoryMap)) {
             for (const keyword of keywords) {
                 if (desc.includes(keyword)) {
-                    return category;
+                    return categoryId;
                 }
             }
         }
         
-        return '📌 Egyéb';
+        return 'other'; // Default to 'other' category ID
     }
 }
 
