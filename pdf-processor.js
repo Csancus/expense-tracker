@@ -341,11 +341,228 @@ class PDFProcessor {
     }
 
     parseRaiffeisenStatement(text) {
-        // Similar structure for Raiffeisen
         console.log('Parsing Raiffeisen statement...');
         const transactions = [];
-        // Implementation for Raiffeisen format
+        const lines = text.split('\n');
+        
+        let inTransactionSection = false;
+        let currentTransaction = null;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            // Start of transaction section (after "Könyvelés" header)
+            if (line.includes('Könyvelés') || line.includes('Tétel azon.')) {
+                inTransactionSection = true;
+                continue;
+            }
+            
+            // End of transaction section
+            if (inTransactionSection && (
+                line.includes('összes terhelés') || 
+                line.includes('NYITÓEGYENLEG:') || 
+                line.includes('ZÁRÓEGYENLEG:') ||
+                line.includes('Oldal')
+            )) {
+                // Complete any pending transaction
+                if (currentTransaction) {
+                    const transaction = this.finalizeRaiffeisenTransaction(currentTransaction);
+                    if (transaction) {
+                        transactions.push(transaction);
+                    }
+                    currentTransaction = null;
+                }
+                break;
+            }
+            
+            if (inTransactionSection) {
+                // Look for transaction ID line (starts with numbers)
+                const transactionMatch = line.match(/^(\d{10})\s+(\d{4}\.\d{2}\.\d{2}\.)\s+(.+?)(?:\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?))?\s*$/);
+                
+                if (transactionMatch) {
+                    // Complete previous transaction if exists
+                    if (currentTransaction) {
+                        const transaction = this.finalizeRaiffeisenTransaction(currentTransaction);
+                        if (transaction) {
+                            transactions.push(transaction);
+                        }
+                    }
+                    
+                    // Start new transaction
+                    currentTransaction = {
+                        id: transactionMatch[1],
+                        date: transactionMatch[2],
+                        description: transactionMatch[3].trim(),
+                        amount: transactionMatch[4] ? this.parseAmount(transactionMatch[4]) : null,
+                        additionalInfo: []
+                    };
+                } else if (currentTransaction) {
+                    // Look for value date line
+                    const valueDateMatch = line.match(/^(\d{4}\.\d{2}\.\d{2}\.)\s+(.+?)(?:\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?))?\s*$/);
+                    if (valueDateMatch && !currentTransaction.valueDate) {
+                        currentTransaction.valueDate = valueDateMatch[1];
+                        if (valueDateMatch[3] && !currentTransaction.amount) {
+                            currentTransaction.amount = this.parseAmount(valueDateMatch[3]);
+                        }
+                        if (valueDateMatch[2].trim()) {
+                            currentTransaction.additionalInfo.push(valueDateMatch[2].trim());
+                        }
+                    } else {
+                        // Additional info lines
+                        if (line.includes('Referencia:')) {
+                            currentTransaction.reference = line.replace('Referencia:', '').trim();
+                        } else if (line.includes('Kedvezményezett neve:')) {
+                            currentTransaction.beneficiary = line.replace('Kedvezményezett neve:', '').trim();
+                        } else if (line.includes('Átutaló neve:')) {
+                            currentTransaction.sender = line.replace('Átutaló neve:', '').trim();
+                        } else if (line.includes('Közlemény:')) {
+                            currentTransaction.memo = line.replace('Közlemény:', '').trim();
+                        } else if (line.includes('Előjegyzett díj:')) {
+                            currentTransaction.fee = line.replace('Előjegyzett díj:', '').trim();
+                        } else if (line.match(/^[A-Z]/) && !line.includes('HUF') && line.length > 5) {
+                            // Other description lines
+                            currentTransaction.additionalInfo.push(line);
+                        }
+                        
+                        // Look for amount in continuation lines
+                        const amountMatch = line.match(/(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*$/);
+                        if (amountMatch && !currentTransaction.amount) {
+                            currentTransaction.amount = this.parseAmount(amountMatch[1]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Complete final transaction
+        if (currentTransaction) {
+            const transaction = this.finalizeRaiffeisenTransaction(currentTransaction);
+            if (transaction) {
+                transactions.push(transaction);
+            }
+        }
+        
+        console.log(`Parsed ${transactions.length} Raiffeisen transactions`);
         return transactions;
+    }
+
+    finalizeRaiffeisenTransaction(rawTransaction) {
+        if (!rawTransaction.amount || rawTransaction.amount === 0) {
+            return null;
+        }
+        
+        // Skip balance and summary lines
+        if (rawTransaction.description && (
+            rawTransaction.description.includes('NYITÓEGYENLEG') ||
+            rawTransaction.description.includes('ZÁRÓEGYENLEG') ||
+            rawTransaction.description.includes('összes terhelés') ||
+            rawTransaction.description.toLowerCase().includes('kamat') && Math.abs(rawTransaction.amount) < 100
+        )) {
+            return null;
+        }
+        
+        // Build merchant name and description
+        let merchant = this.extractRaiffeisenMerchant(rawTransaction);
+        let description = this.buildRaiffeisenDescription(rawTransaction);
+        
+        return {
+            id: Date.now() + Math.random(),
+            date: this.parseRaiffeisenDate(rawTransaction.date),
+            merchant: merchant,
+            description: description,
+            amount: rawTransaction.amount,
+            category: this.suggestCategory(merchant + ' ' + description),
+            bank: 'Raiffeisen',
+            reference: rawTransaction.reference || '',
+            memo: rawTransaction.memo || ''
+        };
+    }
+
+    parseRaiffeisenDate(dateStr) {
+        // Convert 2025.10.01. to 2025-10-01
+        if (dateStr && dateStr.includes('.')) {
+            const parts = dateStr.replace(/\./g, '').split('');
+            if (parts.length >= 8) {
+                const year = parts.slice(0, 4).join('');
+                const month = parts.slice(4, 6).join('');
+                const day = parts.slice(6, 8).join('');
+                return `${year}-${month}-${day}`;
+            }
+        }
+        return dateStr;
+    }
+
+    extractRaiffeisenMerchant(transaction) {
+        // Prioritize beneficiary or sender names
+        if (transaction.beneficiary) {
+            return this.cleanRaiffeisenName(transaction.beneficiary);
+        }
+        
+        if (transaction.sender) {
+            return this.cleanRaiffeisenName(transaction.sender);
+        }
+        
+        // Extract from description
+        let description = transaction.description || '';
+        
+        // Handle specific transaction types
+        if (description.includes('Elektronikus forint átutalás')) {
+            return transaction.beneficiary || 'Átutalás';
+        }
+        
+        if (description.includes('Elektronikus bankon belüli átutalás')) {
+            return transaction.sender || 'Belső átutalás';
+        }
+        
+        if (description.includes('Díj, jutalék')) {
+            return 'Raiffeisen Díj';
+        }
+        
+        if (description.includes('Egyéb jóváírás')) {
+            return 'Promóciós jóváírás';
+        }
+        
+        // Default to first few words of description
+        const words = description.split(' ').slice(0, 3);
+        return words.join(' ') || 'Ismeretlen';
+    }
+
+    cleanRaiffeisenName(name) {
+        if (!name) return 'Ismeretlen';
+        
+        // Remove common suffixes
+        let cleaned = name
+            .replace(/\s+(KFT|ZRT|BT|EGY[ÉE]NI V[ÁA]LLALKOZ[ÓO]|KORL[ÁA]TOLT FELEL[ŐO]SS[ÉE]G[ŰU]|T[ÁA]RSA)[^A-Za-z]*/gi, '')
+            .replace(/\s+EGY[ÉE]NI\s*/gi, ' ')
+            .trim();
+        
+        // Take first meaningful words
+        const words = cleaned.split(/\s+/).slice(0, 3);
+        return words.join(' ') || name;
+    }
+
+    buildRaiffeisenDescription(transaction) {
+        const parts = [];
+        
+        // Add main description
+        if (transaction.description) {
+            parts.push(transaction.description);
+        }
+        
+        // Add additional info
+        if (transaction.additionalInfo && transaction.additionalInfo.length > 0) {
+            parts.push(...transaction.additionalInfo.slice(0, 2)); // Limit to avoid too long descriptions
+        }
+        
+        // Add memo if meaningful
+        if (transaction.memo && transaction.memo.length > 3) {
+            parts.push(`(${transaction.memo})`);
+        }
+        
+        return parts.join(' ').substring(0, 200); // Limit length
     }
 
     parseErsteStatement(text) {
@@ -488,4 +705,11 @@ class PDFProcessor {
 }
 
 // Export for use in main app
-window.PDFProcessor = PDFProcessor;
+if (typeof window !== 'undefined') {
+    window.PDFProcessor = PDFProcessor;
+}
+
+// Export for Node.js testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { PDFProcessor };
+}
