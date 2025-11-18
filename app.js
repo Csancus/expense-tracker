@@ -7,6 +7,7 @@ class ExpenseTracker {
         this.selectedBank = null;
         this.currentTab = 'upload';
         this.isProcessing = false; // Add processing flag
+        this.currentGroupId = null; // For family/group tracking
         this.init();
     }
 
@@ -15,9 +16,25 @@ class ExpenseTracker {
         this.setupUpload();
         this.setupBankSelector();
         this.setupCategoryManagement();
+        this.setupGroupListener();
         this.renderTransactions();
         this.renderAnalytics();
         this.renderCategories();
+    }
+
+    setupGroupListener() {
+        // Listen for group changes from family manager
+        window.addEventListener('groupChanged', (event) => {
+            this.currentGroupId = event.detail.group?.group_id || null;
+            console.log('Group changed to:', this.currentGroupId);
+            
+            // Reload data for new group context
+            this.transactions = this.loadTransactions();
+            this.categories = this.loadCategories();
+            this.renderTransactions();
+            this.renderAnalytics();
+            this.renderCategories();
+        });
     }
 
     // Tab Management

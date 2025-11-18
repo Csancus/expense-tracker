@@ -52,6 +52,7 @@ class SupabaseAuth {
                 if (user) {
                     this.showApp();
                     this.syncDataToCloud();
+                    this.initFamilyManager();
                 } else {
                     this.showAuth();
                 }
@@ -61,6 +62,7 @@ class SupabaseAuth {
             if (this.client.isAuthenticated()) {
                 this.user = this.client.getCurrentUser();
                 this.showApp();
+                this.initFamilyManager();
             } else {
                 this.showAuth();
             }
@@ -418,6 +420,28 @@ class SupabaseAuth {
         const errorDiv = document.getElementById('authError');
         if (errorDiv) {
             errorDiv.style.display = 'none';
+        }
+    }
+
+    initFamilyManager() {
+        if (this.isOffline || !this.client) return;
+        
+        try {
+            // Initialize family manager
+            if (typeof FamilyManager !== 'undefined') {
+                window.familyManager = new FamilyManager(this.client.getSupabaseClient());
+                
+                // Check for pending invitation
+                const pendingInvite = sessionStorage.getItem('pendingInvite');
+                if (pendingInvite) {
+                    sessionStorage.removeItem('pendingInvite');
+                    setTimeout(() => {
+                        window.familyManager.acceptInvitation(pendingInvite);
+                    }, 1000);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to initialize family manager:', error);
         }
     }
 
