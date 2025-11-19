@@ -18,6 +18,8 @@ class ExpenseTracker {
         this.setupCategoryManagement();
         this.setupGroupListener();
         this.setupThemeToggle();
+        this.setupDataManagement();
+        this.setupTransactionFilters();
         
         // Load data asynchronously
         await this.loadInitialData();
@@ -396,13 +398,24 @@ class ExpenseTracker {
     renderTransactions() {
         const container = document.getElementById('transactionsList');
 
+        // Update category filter options
+        this.updateCategoryFilterOptions();
+
         if (this.transactions.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Még nincsenek tranzakciók. Töltsön fel egy bankszámlakivonatot!</p>';
             return;
         }
 
+        // Get filtered transactions
+        const filtered = this.getFilteredTransactions();
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Nincs tranzakció a megadott szűrési feltételeknek megfelelően.</p>';
+            return;
+        }
+
         // Sort by date
-        const sorted = [...this.transactions].sort((a, b) =>
+        const sorted = filtered.sort((a, b) =>
             new Date(b.date) - new Date(a.date)
         );
 
@@ -1001,6 +1014,481 @@ class ExpenseTracker {
         }
         
         return 'other';
+    }
+
+    setupDataManagement() {
+        // Export data button
+        const exportBtn = document.getElementById('exportDataBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.showExportOptions());
+        }
+
+        // Period selector change
+        const periodSelect = document.getElementById('exportPeriod');
+        if (periodSelect) {
+            periodSelect.addEventListener('change', (e) => {
+                const customPeriod = document.getElementById('customPeriod');
+                customPeriod.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+            });
+        }
+
+        // Download export button
+        const downloadBtn = document.getElementById('downloadExportBtn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => this.downloadExport());
+        }
+
+        // Import data button
+        const importBtn = document.getElementById('importDataBtn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => this.showImportDialog());
+        }
+
+        // Backup data button
+        const backupBtn = document.getElementById('backupDataBtn');
+        if (backupBtn) {
+            backupBtn.addEventListener('click', () => this.createBackup());
+        }
+
+        // Clear all data button
+        const clearBtn = document.getElementById('clearAllDataBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.confirmClearAllData());
+        }
+    }
+
+    showExportOptions() {
+        const exportOptions = document.getElementById('exportOptions');
+        exportOptions.style.display = exportOptions.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async downloadExport() {
+        const scope = document.querySelector('input[name="exportScope"]:checked').value;
+        const format = document.getElementById('exportFormat').value;
+        const period = document.getElementById('exportPeriod').value;
+        
+        let transactions = [];
+        let categories = [];
+        
+        if (scope === 'current') {
+            transactions = this.transactions;
+            categories = this.categories;
+        } else {
+            // Load all groups data (would need implementation)
+            transactions = this.transactions; // For now, just current
+            categories = this.categories;
+        }
+
+        // Filter by period
+        transactions = this.filterTransactionsByPeriod(transactions, period);
+
+        const fileName = `expense-tracker-${scope}-${new Date().toISOString().split('T')[0]}`;
+
+        switch (format) {
+            case 'csv':
+                this.downloadCSV(transactions, categories, fileName);
+                break;
+            case 'json':
+                this.downloadJSON({ transactions, categories }, fileName);
+                break;
+            case 'pdf':
+                await this.downloadPDF(transactions, categories, fileName);
+                break;
+        }
+
+        // Hide export options
+        document.getElementById('exportOptions').style.display = 'none';
+    }
+
+    filterTransactionsByPeriod(transactions, period) {
+        const now = new Date();
+        let startDate, endDate;
+
+        switch (period) {
+            case 'year':
+                startDate = new Date(now.getFullYear(), 0, 1);
+                endDate = new Date(now.getFullYear(), 11, 31);
+                break;
+            case 'quarter':
+                const quarter = Math.floor(now.getMonth() / 3);
+                startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                endDate = new Date(now.getFullYear(), quarter * 3 + 3, 0);
+                break;
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'custom':
+                startDate = new Date(document.getElementById('startDate').value);
+                endDate = new Date(document.getElementById('endDate').value);
+                if (!startDate || !endDate) return transactions;
+                break;
+            default:
+                return transactions;
+        }
+
+        return transactions.filter(t => {
+            const transactionDate = new Date(t.date);
+            return transactionDate >= startDate && transactionDate <= endDate;
+        });
+    }
+
+    downloadCSV(transactions, categories, fileName) {
+        const categoryMap = {};
+        categories.forEach(cat => {
+            categoryMap[cat.id] = cat.name;
+        });
+
+        let csvContent = 'Dátum,Leírás,Összeg,Kategória,Kereskedő\n';
+        
+        transactions.forEach(t => {
+            const categoryName = categoryMap[t.category] || 'Egyéb';
+            const amount = t.amount.toString().replace('.', ','); // Hungarian format
+            csvContent += `"${t.date}","${t.description || ''}","${amount}","${categoryName}","${t.merchant || ''}"\n`;
+        });
+
+        this.downloadFile(csvContent, `${fileName}.csv`, 'text/csv');
+    }
+
+    downloadJSON(data, fileName) {
+        const jsonContent = JSON.stringify(data, null, 2);
+        this.downloadFile(jsonContent, `${fileName}.json`, 'application/json');
+    }
+
+    async downloadPDF(transactions, categories, fileName) {
+        // For now, create a simple HTML report that can be printed as PDF
+        const categoryMap = {};
+        categories.forEach(cat => {
+            categoryMap[cat.id] = cat.name;
+        });
+
+        const totalIncome = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+        const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Expense Tracker Jelentés</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .summary { background: #f5f5f5; padding: 15px; margin-bottom: 20px; }
+        .transactions { width: 100%; border-collapse: collapse; }
+        .transactions th, .transactions td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .transactions th { background-color: #f2f2f2; }
+        .expense { color: #dc3545; }
+        .income { color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💰 Expense Tracker Jelentés</h1>
+        <p>Generálva: ${new Date().toLocaleDateString('hu-HU')}</p>
+    </div>
+    
+    <div class="summary">
+        <h3>Összesítő</h3>
+        <p><strong>Bevétel:</strong> <span class="income">+${totalIncome.toLocaleString('hu-HU')} Ft</span></p>
+        <p><strong>Kiadás:</strong> <span class="expense">-${totalExpense.toLocaleString('hu-HU')} Ft</span></p>
+        <p><strong>Egyenleg:</strong> ${(totalIncome - totalExpense).toLocaleString('hu-HU')} Ft</p>
+        <p><strong>Tranzakciók száma:</strong> ${transactions.length}</p>
+    </div>
+
+    <table class="transactions">
+        <thead>
+            <tr>
+                <th>Dátum</th>
+                <th>Leírás</th>
+                <th>Kereskedő</th>
+                <th>Kategória</th>
+                <th>Összeg</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${transactions.map(t => `
+                <tr>
+                    <td>${t.date}</td>
+                    <td>${t.description || ''}</td>
+                    <td>${t.merchant || ''}</td>
+                    <td>${categoryMap[t.category] || 'Egyéb'}</td>
+                    <td class="${t.amount < 0 ? 'expense' : 'income'}">
+                        ${t.amount > 0 ? '+' : ''}${t.amount.toLocaleString('hu-HU')} Ft
+                    </td>
+                </tr>
+            `).join('')}
+        </tbody>
+    </table>
+</body>
+</html>`;
+
+        // Open in new window for printing
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        
+        alert('PDF jelentés megnyitva új ablakban. Használja a böngésző nyomtatás funkcióját a PDF mentéshez.');
+    }
+
+    downloadFile(content, fileName, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
+    showImportDialog() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Adatok importálása</h3>
+                    <button class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Válassza ki az importálandó fájlt:</label>
+                        <input type="file" id="importFile" accept=".csv,.json" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem;">
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" onclick="this.closest('.modal-overlay').querySelector('#importFile').files[0] && window.app.processImport(this.closest('.modal-overlay').querySelector('#importFile').files[0]); this.closest('.modal-overlay').remove();">
+                            📥 Importálás
+                        </button>
+                        <button class="btn btn-secondary modal-close">Mégse</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        modal.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => modal.remove());
+        });
+    }
+
+    createBackup() {
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            version: '1.0.9',
+            transactions: this.transactions,
+            categories: this.categories,
+            categoryRules: this.categoryRules,
+            currentGroup: window.familyManager ? window.familyManager.currentGroup : null
+        };
+
+        const fileName = `expense-tracker-backup-${new Date().toISOString().split('T')[0]}`;
+        this.downloadJSON(backupData, fileName);
+        
+        alert('Biztonsági mentés létrehozva és letöltve!');
+    }
+
+    confirmClearAllData() {
+        if (confirm('FIGYELEM: Ez törli az összes adatot! Ez a művelet nem visszavonható. Biztos benne?')) {
+            if (confirm('Utolsó figyelmeztetés: Az összes tranzakció, kategória és beállítás törlésre kerül. Folytatja?')) {
+                this.clearAllData();
+            }
+        }
+    }
+
+    clearAllData() {
+        // Clear local storage
+        localStorage.removeItem('expense_transactions');
+        localStorage.removeItem('expense_categories');
+        localStorage.removeItem('expense_category_rules');
+
+        // Clear current data
+        this.transactions = [];
+        this.categories = this.getDefaultCategories();
+        this.categoryRules = [];
+
+        // Re-render everything
+        this.renderTransactions();
+        this.renderAnalytics();
+        this.renderCategories();
+
+        alert('Minden adat törölve! Az alkalmazás visszaállt az alapállapotra.');
+    }
+
+    getDefaultCategories() {
+        return [
+            { id: 'food', name: 'Élelmiszer', emoji: '🍔', color: '#EF4444' },
+            { id: 'transport', name: 'Közlekedés', emoji: '🚗', color: '#F59E0B' },
+            { id: 'utilities', name: 'Rezsi', emoji: '🏠', color: '#10B981' },
+            { id: 'shopping', name: 'Vásárlás', emoji: '🛍️', color: '#3B82F6' },
+            { id: 'entertainment', name: 'Szórakozás', emoji: '🎬', color: '#8B5CF6' },
+            { id: 'other', name: 'Egyéb', emoji: '📌', color: '#6B7280' }
+        ];
+    }
+
+    setupTransactionFilters() {
+        // Initialize filter state
+        this.currentFilters = {
+            search: '',
+            category: '',
+            startDate: '',
+            endDate: '',
+            minAmount: '',
+            maxAmount: '',
+            type: ''
+        };
+
+        // Set up filter event listeners
+        const searchInput = document.getElementById('transactionSearch');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const startDateFilter = document.getElementById('startDateFilter');
+        const endDateFilter = document.getElementById('endDateFilter');
+        const minAmountFilter = document.getElementById('minAmount');
+        const maxAmountFilter = document.getElementById('maxAmount');
+        const typeFilter = document.getElementById('transactionType');
+        const applyButton = document.getElementById('applyFiltersBtn');
+        const clearButton = document.getElementById('clearFiltersBtn');
+
+        // Real-time search
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.currentFilters.search = e.target.value;
+                this.applyFilters();
+            });
+        }
+
+        // Apply filters button
+        if (applyButton) {
+            applyButton.addEventListener('click', () => {
+                this.collectFilterValues();
+                this.applyFilters();
+            });
+        }
+
+        // Clear filters button
+        if (clearButton) {
+            clearButton.addEventListener('click', () => {
+                this.clearAllFilters();
+            });
+        }
+
+        // Enter key on inputs
+        [categoryFilter, startDateFilter, endDateFilter, minAmountFilter, maxAmountFilter, typeFilter].forEach(input => {
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.collectFilterValues();
+                        this.applyFilters();
+                    }
+                });
+            }
+        });
+    }
+
+    collectFilterValues() {
+        this.currentFilters = {
+            search: document.getElementById('transactionSearch')?.value || '',
+            category: document.getElementById('categoryFilter')?.value || '',
+            startDate: document.getElementById('startDateFilter')?.value || '',
+            endDate: document.getElementById('endDateFilter')?.value || '',
+            minAmount: document.getElementById('minAmount')?.value || '',
+            maxAmount: document.getElementById('maxAmount')?.value || '',
+            type: document.getElementById('transactionType')?.value || ''
+        };
+    }
+
+    applyFilters() {
+        this.renderTransactions();
+    }
+
+    clearAllFilters() {
+        // Clear form inputs
+        document.getElementById('transactionSearch').value = '';
+        document.getElementById('categoryFilter').value = '';
+        document.getElementById('startDateFilter').value = '';
+        document.getElementById('endDateFilter').value = '';
+        document.getElementById('minAmount').value = '';
+        document.getElementById('maxAmount').value = '';
+        document.getElementById('transactionType').value = '';
+
+        // Clear filter state
+        this.currentFilters = {
+            search: '',
+            category: '',
+            startDate: '',
+            endDate: '',
+            minAmount: '',
+            maxAmount: '',
+            type: ''
+        };
+
+        // Re-render without filters
+        this.renderTransactions();
+    }
+
+    getFilteredTransactions() {
+        let filtered = [...this.transactions];
+
+        // Search filter
+        if (this.currentFilters.search) {
+            const search = this.currentFilters.search.toLowerCase();
+            filtered = filtered.filter(t => 
+                (t.description || '').toLowerCase().includes(search) ||
+                (t.merchant || '').toLowerCase().includes(search)
+            );
+        }
+
+        // Category filter
+        if (this.currentFilters.category) {
+            filtered = filtered.filter(t => t.category === this.currentFilters.category);
+        }
+
+        // Date range filter
+        if (this.currentFilters.startDate) {
+            const startDate = new Date(this.currentFilters.startDate);
+            filtered = filtered.filter(t => new Date(t.date) >= startDate);
+        }
+        if (this.currentFilters.endDate) {
+            const endDate = new Date(this.currentFilters.endDate);
+            filtered = filtered.filter(t => new Date(t.date) <= endDate);
+        }
+
+        // Amount range filter
+        if (this.currentFilters.minAmount !== '') {
+            const minAmount = parseFloat(this.currentFilters.minAmount);
+            filtered = filtered.filter(t => Math.abs(t.amount) >= minAmount);
+        }
+        if (this.currentFilters.maxAmount !== '') {
+            const maxAmount = parseFloat(this.currentFilters.maxAmount);
+            filtered = filtered.filter(t => Math.abs(t.amount) <= maxAmount);
+        }
+
+        // Transaction type filter
+        if (this.currentFilters.type === 'income') {
+            filtered = filtered.filter(t => t.amount > 0);
+        } else if (this.currentFilters.type === 'expense') {
+            filtered = filtered.filter(t => t.amount < 0);
+        }
+
+        return filtered;
+    }
+
+    updateCategoryFilterOptions() {
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (!categoryFilter) return;
+
+        // Clear existing options except the first one
+        categoryFilter.innerHTML = '<option value="">Minden kategória</option>';
+
+        // Add categories
+        this.categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = `${cat.emoji} ${cat.name}`;
+            categoryFilter.appendChild(option);
+        });
     }
 
     setupThemeToggle() {

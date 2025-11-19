@@ -89,17 +89,40 @@
                     <h2>Tranzakciók</h2>
                     
                     <div class="filters">
-                        <input type="text" placeholder="🔍 Keresés..." class="search-input">
-                        <select class="filter-select">
-                            <option value="">Minden kategória</option>
-                            <option value="food">🍔 Élelmiszer</option>
-                            <option value="transport">🚗 Közlekedés</option>
-                            <option value="utilities">🏠 Rezsi</option>
-                            <option value="shopping">🛍️ Vásárlás</option>
-                            <option value="entertainment">🎬 Szórakozás</option>
-                        </select>
-                        <input type="date" class="date-filter">
-                        <input type="date" class="date-filter">
+                        <div class="filter-row">
+                            <input type="text" placeholder="🔍 Keresés leírás vagy kereskedő alapján..." class="search-input" id="transactionSearch">
+                            <select class="filter-select" id="categoryFilter">
+                                <option value="">Minden kategória</option>
+                            </select>
+                        </div>
+                        <div class="filter-row">
+                            <div class="date-range">
+                                <label>Időszak:</label>
+                                <input type="date" class="date-filter" id="startDateFilter" placeholder="Kezdő dátum">
+                                <span>-</span>
+                                <input type="date" class="date-filter" id="endDateFilter" placeholder="Záró dátum">
+                            </div>
+                            <div class="amount-range">
+                                <label>Összeg:</label>
+                                <input type="number" class="amount-filter" id="minAmount" placeholder="Min összeg">
+                                <span>-</span>
+                                <input type="number" class="amount-filter" id="maxAmount" placeholder="Max összeg">
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="transaction-type">
+                                <label>Típus:</label>
+                                <select id="transactionType">
+                                    <option value="">Mind</option>
+                                    <option value="income">Bevétel</option>
+                                    <option value="expense">Kiadás</option>
+                                </select>
+                            </div>
+                            <div class="filter-actions">
+                                <button class="btn btn-primary" id="applyFiltersBtn">Szűrés alkalmazása</button>
+                                <button class="btn btn-secondary" id="clearFiltersBtn">Szűrők törlése</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="transactions-list" id="transactionsList">
@@ -229,8 +252,65 @@
 
                     <div class="settings-group">
                         <h3>💾 Adatok</h3>
-                        <button class="btn btn-primary">Exportálás CSV-be</button>
-                        <button class="btn btn-danger">Összes adat törlése</button>
+                        <div class="data-actions">
+                            <button class="btn btn-primary" id="exportDataBtn">
+                                📊 Adatok exportálása
+                            </button>
+                            <button class="btn btn-secondary" id="importDataBtn">
+                                📥 Adatok importálása
+                            </button>
+                            <button class="btn btn-outline" id="backupDataBtn">
+                                💾 Biztonsági mentés
+                            </button>
+                            <button class="btn btn-danger" id="clearAllDataBtn">
+                                🗑️ Összes adat törlése
+                            </button>
+                        </div>
+                        <div class="export-options" id="exportOptions" style="display: none;">
+                            <h4>Export beállítások:</h4>
+                            <div class="form-group">
+                                <label>
+                                    <input type="radio" name="exportScope" value="current" checked>
+                                    Csak jelenlegi csoport adatai
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="radio" name="exportScope" value="all">
+                                    Összes csoport adatai
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Formátum:</label>
+                                <select id="exportFormat">
+                                    <option value="csv">CSV (Excel compatible)</option>
+                                    <option value="json">JSON (teljes adatstruktúra)</option>
+                                    <option value="pdf">PDF jelentés</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Időszak:</label>
+                                <select id="exportPeriod">
+                                    <option value="all">Összes idő</option>
+                                    <option value="year">Ez az év</option>
+                                    <option value="quarter">Ez a negyedév</option>
+                                    <option value="month">Ez a hónap</option>
+                                    <option value="custom">Egyedi időszak</option>
+                                </select>
+                            </div>
+                            <div id="customPeriod" style="display: none;">
+                                <input type="date" id="startDate" placeholder="Kezdő dátum">
+                                <input type="date" id="endDate" placeholder="Záró dátum">
+                            </div>
+                            <div class="export-actions">
+                                <button class="btn btn-primary" id="downloadExportBtn">
+                                    ⬇️ Letöltés
+                                </button>
+                                <button class="btn btn-secondary" onclick="document.getElementById('exportOptions').style.display='none'">
+                                    Mégse
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -252,11 +332,11 @@
     <meta name="SUPABASE_ANON_KEY" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbWF6bnl5YXJ0cnN0bGlld2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NDUzMDAsImV4cCI6MjA3OTAyMTMwMH0.lRR78pV6NPSZa-pDrqOUPFK7gPBfWb6DqMAZKwNmX-A">
     
     <!-- App Scripts -->
-    <script src="pdf-processor.js?v=16"></script>
-    <script src="excel-processor.js?v=16"></script>
-    <script src="supabase-client.js?v=16"></script>
-    <script src="supabase-auth.js?v=16"></script>
-    <script src="family-manager.js?v=16"></script>
-    <script src="app.js?v=16"></script>
+    <script src="pdf-processor.js?v=17"></script>
+    <script src="excel-processor.js?v=17"></script>
+    <script src="supabase-client.js?v=17"></script>
+    <script src="supabase-auth.js?v=17"></script>
+    <script src="family-manager.js?v=17"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>
