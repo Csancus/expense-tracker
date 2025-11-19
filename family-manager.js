@@ -187,6 +187,68 @@ class FamilyManager {
         }
     }
 
+    async createFamilyMember(groupId, email, password, role = 'member') {
+        try {
+            // First, create the user account in Supabase Auth
+            const { data: authData, error: authError } = await this.supabase.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    emailRedirectTo: window.location.origin
+                }
+            });
+
+            if (authError) {
+                if (authError.message.includes('User already registered')) {
+                    throw new Error('Ez az email cím már regisztrált. Használjon másik email címet vagy hívja meg a meglévő felhasználót.');
+                }
+                throw authError;
+            }
+
+            const userId = authData.user?.id;
+            if (!userId) {
+                throw new Error('Nem sikerült létrehozni a felhasználó fiókot');
+            }
+
+            // Set permissions based on role
+            const permissions = {
+                view: true,
+                add: role !== 'viewer',
+                edit: ['owner', 'admin'].includes(role),
+                delete: role === 'owner'
+            };
+
+            // Add user to the group
+            const { error: memberError } = await this.supabase
+                .from('group_members')
+                .insert({
+                    group_id: groupId,
+                    user_id: userId,
+                    role: role,
+                    permissions: permissions
+                });
+
+            if (memberError) {
+                console.error('Failed to add user to group:', memberError);
+                // User was created but couldn't be added to group
+                throw new Error('Felhasználó létrehozva, de nem sikerült hozzáadni a csoporthoz. Próbálja meg újra meghívni.');
+            }
+
+            return { 
+                success: true, 
+                user: { id: userId, email: email },
+                message: 'Családtag sikeresen létrehozva és hozzáadva a csoporthoz!'
+            };
+            
+        } catch (error) {
+            console.error('Failed to create family member:', error);
+            return { 
+                success: false, 
+                error: error.message || 'Hiba történt a családtag létrehozása során'
+            };
+        }
+    }
+
     async acceptInvitation(token) {
         try {
             const { data, error } = await this.supabase.rpc('accept_group_invitation', {
@@ -463,7 +525,7 @@ class FamilyManager {
                             <div class="group-actions">
                                 ${group.is_owner ? `
                                     <button class="btn btn-sm" onclick="familyManager.showInviteUsers('${group.group_id}')">
-                                        📧 Invite Users
+                                        👤 Családtag hozzáadása
                                     </button>
                                 ` : ''}
                                 <button class="btn btn-sm" onclick="familyManager.showGroupMembers('${group.group_id}')">
@@ -482,46 +544,86 @@ class FamilyManager {
 
     async showInviteUsers(groupId) {
         const modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'modal-overlay';
         modal.innerHTML = `
-            <div class="modal-content">
-                <h2>Invite Users</h2>
-                <form id="inviteUserForm">
-                    <div class="form-group">
-                        <label>Email Address:</label>
-                        <input type="email" id="inviteEmail" required 
-                               placeholder="user@example.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Role:</label>
-                        <select id="inviteRole">
-                            <option value="member">Member (can add/view expenses)</option>
-                            <option value="admin">Admin (can manage group)</option>
-                            <option value="viewer">Viewer (can only view)</option>
-                        </select>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Send Invitation</button>
-                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
-                    </div>
-                </form>
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Családtag hozzáadása</h3>
+                    <button class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="inviteUserForm">
+                        <div class="form-group">
+                            <label>Email cím:</label>
+                            <input type="email" id="inviteEmail" required 
+                                   placeholder="csaladtag@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Jelszó:</label>
+                            <input type="password" id="invitePassword" required 
+                                   placeholder="Minimum 6 karakter" minlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label>Jelszó megerősítése:</label>
+                            <input type="password" id="invitePasswordConfirm" required 
+                                   placeholder="Jelszó újra" minlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label>Szerepkör:</label>
+                            <select id="inviteRole">
+                                <option value="member">Családtag (hozzáadhat és megtekinthet)</option>
+                                <option value="admin">Adminisztrátor (kezelhet mindent)</option>
+                                <option value="viewer">Néző (csak megtekinthet)</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Családtag létrehozása</button>
+                            <button type="button" class="btn btn-secondary modal-close">Mégse</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         `;
         
         document.body.appendChild(modal);
         
+        // Close modal event listeners
+        modal.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => modal.remove());
+        });
+        
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+        
         document.getElementById('inviteUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const email = document.getElementById('inviteEmail').value;
+            const password = document.getElementById('invitePassword').value;
+            const confirmPassword = document.getElementById('invitePasswordConfirm').value;
             const role = document.getElementById('inviteRole').value;
             
-            const result = await this.inviteUser(groupId, email, role);
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                alert('A jelszavak nem egyeznek!');
+                return;
+            }
+            
+            if (password.length < 6) {
+                alert('A jelszó legalább 6 karakter hosszú legyen!');
+                return;
+            }
+            
+            const result = await this.createFamilyMember(groupId, email, password, role);
             
             if (result.success) {
+                alert(`Családtag sikeresen létrehozva!\nEmail: ${email}\nJelszó: ${password}\n\nA családtag most már bejelentkezhet ezekkel az adatokkal.`);
                 modal.remove();
+                await this.loadUserGroups(); // Refresh group data
             } else {
-                alert('Failed to send invitation: ' + result.error);
+                alert('Hiba történt: ' + result.error);
             }
         });
     }
