@@ -1,6 +1,6 @@
 {
   "name": "expense-tracker",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Smart personal finance management tool with multi-bank statement parsing and family budget tracking",
   "scripts": {
     "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\"",

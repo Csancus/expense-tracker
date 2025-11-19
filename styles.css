@@ -1383,6 +1383,25 @@ body {
     border-color: var(--text-secondary);
 }
 
+/* Group switcher in settings */
+.group-selector-settings {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.group-selector-settings label {
+    display: block;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+/* Hide header group selector since we moved to Settings */
+.group-selector {
+    display: none !important;
+}
+
 /* Responsive family actions */
 @media (max-width: 768px) {
     .family-actions {

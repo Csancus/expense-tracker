@@ -33,7 +33,8 @@ class FamilyManager {
 
     setupUI() {
         this.createGroupManagementUI();
-        this.createGroupSelector();
+        // Remove header group selector - only use Settings
+        // this.createGroupSelector();
         this.setupSettingsIntegration();
     }
 
@@ -64,7 +65,7 @@ class FamilyManager {
                             🔗 Join Group
                         </button>
                         <button class="btn btn-sm" onclick="familyManager.showManageGroups()">
-                            ⚙️ Manage
+                            ⚙️ Részletes kezelés
                         </button>
                     </div>
                 </div>
@@ -661,6 +662,7 @@ FamilyManager.prototype.setupSettingsIntegration = function() {
     const createGroupBtn = document.getElementById('createGroupBtn');
     const addFamilyMemberBtn = document.getElementById('addFamilyMemberBtn');
     const manageGroupsBtn = document.getElementById('manageGroupsBtn');
+    const groupSwitcher = document.getElementById('groupSwitcher');
     
     if (createGroupBtn) {
         createGroupBtn.addEventListener('click', () => this.showCreateGroup());
@@ -679,6 +681,13 @@ FamilyManager.prototype.setupSettingsIntegration = function() {
     
     if (manageGroupsBtn) {
         manageGroupsBtn.addEventListener('click', () => this.showManageGroups());
+    }
+    
+    if (groupSwitcher) {
+        groupSwitcher.addEventListener('change', (e) => {
+            const selectedGroupId = e.target.value;
+            this.switchToGroup(selectedGroupId);
+        });
     }
 };
 
@@ -705,6 +714,9 @@ FamilyManager.prototype.updateSettingsDisplay = function() {
     
     // Load and display current group members
     this.loadCurrentGroupMembers();
+    
+    // Update group switcher dropdown
+    this.updateGroupSwitcher();
 };
 
 FamilyManager.prototype.loadCurrentGroupMembers = async function() {
@@ -761,6 +773,46 @@ FamilyManager.prototype.translateRole = function(role) {
         'viewer': 'Néző'
     };
     return roleTranslations[role] || role;
+};
+
+FamilyManager.prototype.updateGroupSwitcher = function() {
+    const groupSwitcher = document.getElementById('groupSwitcher');
+    if (!groupSwitcher) return;
+    
+    // Clear current options
+    groupSwitcher.innerHTML = '<option value="">Személyes mód</option>';
+    
+    // Add user groups
+    this.userGroups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.group_id;
+        option.textContent = group.group_name;
+        
+        // Select current group
+        if (this.currentGroup && this.currentGroup.group_id === group.group_id) {
+            option.selected = true;
+        }
+        
+        groupSwitcher.appendChild(option);
+    });
+};
+
+FamilyManager.prototype.switchToGroup = function(groupId) {
+    if (!groupId) {
+        // Switch to personal mode
+        this.currentGroup = null;
+    } else {
+        // Switch to selected group
+        this.currentGroup = this.userGroups.find(g => g.group_id === groupId);
+    }
+    
+    // Update displays
+    this.updateSettingsDisplay();
+    
+    // Dispatch group change event for other components
+    window.dispatchEvent(new CustomEvent('groupChanged', {
+        detail: { group: this.currentGroup }
+    }));
 };
 
 // Export for use

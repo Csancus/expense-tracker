@@ -168,14 +168,16 @@ class SupabaseClient {
         return data || [];
     }
 
-    async createTransaction(transaction) {
+    async createTransaction(transaction, groupId = null) {
         if (!this.user) throw new Error('Not authenticated');
         
         const { data, error } = await this.supabase
             .from('transactions')
             .insert({
                 ...transaction,
-                user_id: this.user.id
+                user_id: this.user.id,
+                group_id: groupId,
+                added_by: this.user.id
             })
             .select()
             .single();
@@ -184,12 +186,14 @@ class SupabaseClient {
         return data;
     }
 
-    async createTransactions(transactions) {
+    async createTransactions(transactions, groupId = null) {
         if (!this.user) throw new Error('Not authenticated');
         
         const transactionsWithUser = transactions.map(t => ({
             ...t,
-            user_id: this.user.id
+            user_id: this.user.id,
+            group_id: groupId,
+            added_by: this.user.id
         }));
         
         const { data, error } = await this.supabase
@@ -396,6 +400,61 @@ class SupabaseClient {
 
     getSupabaseClient() {
         return this.supabase;
+    }
+
+    // Group-based data loading
+    async loadGroupTransactions(groupId = null) {
+        if (!this.user) return [];
+        
+        try {
+            let query = this.supabase
+                .from('transactions')
+                .select('*')
+                .order('date', { ascending: false });
+                
+            if (groupId) {
+                // Load group transactions
+                query = query.eq('group_id', groupId);
+            } else {
+                // Load personal transactions (no group)
+                query = query.eq('user_id', this.user.id).is('group_id', null);
+            }
+            
+            const { data, error } = await query;
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Failed to load group transactions:', error);
+            return [];
+        }
+    }
+
+    async loadGroupCategories(groupId = null) {
+        if (!this.user) return [];
+        
+        try {
+            let query = this.supabase
+                .from('categories')
+                .select('*')
+                .order('name');
+                
+            if (groupId) {
+                // Load group categories
+                query = query.eq('group_id', groupId);
+            } else {
+                // Load personal categories (no group)
+                query = query.eq('user_id', this.user.id).is('group_id', null);
+            }
+            
+            const { data, error } = await query;
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Failed to load group categories:', error);
+            return [];
+        }
     }
 }
 

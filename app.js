@@ -1,8 +1,8 @@
 // Expense Tracker App - Fixed Version
 class ExpenseTracker {
     constructor() {
-        this.transactions = this.loadTransactions();
-        this.categories = this.loadCategories();
+        this.transactions = [];
+        this.categories = [];
         this.categoryRules = this.loadCategoryRules(); // Time-based category rules
         this.selectedBank = null;
         this.currentTab = 'upload';
@@ -11,27 +11,36 @@ class ExpenseTracker {
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupTabs();
         this.setupUpload();
         this.setupBankSelector();
         this.setupCategoryManagement();
         this.setupGroupListener();
         this.setupThemeToggle();
+        
+        // Load data asynchronously
+        await this.loadInitialData();
+        
         this.renderTransactions();
         this.renderAnalytics();
         this.renderCategories();
     }
 
+    async loadInitialData() {
+        this.transactions = await this.loadTransactions();
+        this.categories = await this.loadCategories();
+    }
+
     setupGroupListener() {
         // Listen for group changes from family manager
-        window.addEventListener('groupChanged', (event) => {
+        window.addEventListener('groupChanged', async (event) => {
             this.currentGroupId = event.detail.group?.group_id || null;
             console.log('Group changed to:', this.currentGroupId);
             
             // Reload data for new group context
-            this.transactions = this.loadTransactions();
-            this.categories = this.loadCategories();
+            this.transactions = await this.loadTransactions();
+            this.categories = await this.loadCategories();
             this.renderTransactions();
             this.renderAnalytics();
             this.renderCategories();
@@ -197,7 +206,7 @@ class ExpenseTracker {
         const transactions = await pdfProcessor.processPDF(file, this.selectedBank);
 
         if (transactions && transactions.length > 0) {
-            this.addTransactions(transactions);
+            await this.addTransactions(transactions);
             this.showSuccess(transactions.length);
         } else {
             alert('Nem találtunk tranzakciókat a PDF fájlban.');
@@ -221,7 +230,7 @@ class ExpenseTracker {
         const transactions = await excelProcessor.processExcel(file, this.selectedBank);
 
         if (transactions && transactions.length > 0) {
-            this.addTransactions(transactions);
+            await this.addTransactions(transactions);
             this.showSuccess(transactions.length);
         } else {
             alert('Nem találtunk tranzakciókat az Excel fájlban.');
@@ -255,7 +264,7 @@ class ExpenseTracker {
         const transactions = this.parseCSV(text, this.selectedBank);
 
         if (transactions.length > 0) {
-            this.addTransactions(transactions);
+            await this.addTransactions(transactions);
             this.showSuccess(transactions.length);
         } else {
             alert('Nem találtunk tranzakciókat a CSV fájlban.');
@@ -309,7 +318,7 @@ class ExpenseTracker {
         }, 2000);
     }
 
-    addTransactions(newTransactions) {
+    async addTransactions(newTransactions) {
         // Check for duplicates
         const existingHashes = new Set(
             this.transactions.map(t => this.getTransactionHash(t))
@@ -322,6 +331,20 @@ class ExpenseTracker {
 
         // Add unique transactions
         this.transactions.push(...uniqueTransactions);
+        
+        // Save to Supabase if available
+        if (window.supabaseAuth && window.supabaseAuth.isAuthenticated() && !window.supabaseAuth.isOffline) {
+            try {
+                const client = window.supabaseAuth.getClient();
+                if (client && uniqueTransactions.length > 0) {
+                    console.log('Saving new transactions to Supabase for group:', this.currentGroupId);
+                    await client.createTransactions(uniqueTransactions, this.currentGroupId);
+                }
+            } catch (error) {
+                console.error('Failed to save transactions to Supabase:', error);
+            }
+        }
+        
         this.saveTransactions();
 
         console.log(`Added ${uniqueTransactions.length} unique transactions (${newTransactions.length - uniqueTransactions.length} duplicates skipped)`);
@@ -539,17 +562,63 @@ class ExpenseTracker {
         return `${sign}${abs.toLocaleString('hu-HU')} Ft`;
     }
 
-    saveTransactions() {
+    async saveTransactions() {
         localStorage.setItem('expense_transactions', JSON.stringify(this.transactions));
+        
+        // Also save to Supabase if available
+        if (window.supabaseAuth && window.supabaseAuth.isAuthenticated() && !window.supabaseAuth.isOffline) {
+            try {
+                const client = window.supabaseAuth.getClient();
+                if (client) {
+                    console.log('Saving transactions to Supabase for group:', this.currentGroupId);
+                    // Note: Individual transactions should be saved via createTransaction/createTransactions
+                    // This is mainly for localStorage backup
+                }
+            } catch (error) {
+                console.error('Failed to save transactions to Supabase:', error);
+            }
+        }
     }
 
-    loadTransactions() {
+    async loadTransactions() {
+        // Try to load from Supabase first, fallback to localStorage
+        if (window.supabaseAuth && window.supabaseAuth.isAuthenticated() && !window.supabaseAuth.isOffline) {
+            try {
+                const client = window.supabaseAuth.getClient();
+                if (client) {
+                    const transactions = await client.loadGroupTransactions(this.currentGroupId);
+                    console.log(`Loaded ${transactions.length} transactions from Supabase for group:`, this.currentGroupId);
+                    return transactions;
+                }
+            } catch (error) {
+                console.error('Failed to load transactions from Supabase:', error);
+            }
+        }
+        
+        // Fallback to localStorage
         const saved = localStorage.getItem('expense_transactions');
         return saved ? JSON.parse(saved) : [];
     }
 
     // Category Management
-    loadCategories() {
+    async loadCategories() {
+        // Try to load from Supabase first, fallback to localStorage
+        if (window.supabaseAuth && window.supabaseAuth.isAuthenticated() && !window.supabaseAuth.isOffline) {
+            try {
+                const client = window.supabaseAuth.getClient();
+                if (client) {
+                    const categories = await client.loadGroupCategories(this.currentGroupId);
+                    if (categories.length > 0) {
+                        console.log(`Loaded ${categories.length} categories from Supabase for group:`, this.currentGroupId);
+                        return categories;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load categories from Supabase:', error);
+            }
+        }
+        
+        // Fallback to localStorage or defaults
         const saved = localStorage.getItem('expense_categories');
         return saved ? JSON.parse(saved) : [
             { id: 'food', name: 'Élelmiszer', emoji: '🍔', color: '#EF4444' },
