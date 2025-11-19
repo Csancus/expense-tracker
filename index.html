@@ -163,9 +163,37 @@
                     <div class="settings-group" id="familyMembersSection">
                         <h3>👥 Családtagok és csoportok</h3>
                         <div id="familyMembersContent">
-                            <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">
-                                A családtag és csoport kezelés a fejlécben található "Család kiválasztása" gombbal elérhető.
-                            </p>
+                            <!-- Current group info -->
+                            <div id="currentGroupInfo" class="current-group-info">
+                                <div class="group-card">
+                                    <h4>Jelenlegi csoport: <span id="currentGroupName">Personal</span></h4>
+                                    <p id="currentGroupDescription">Személyes költségvetés</p>
+                                    <div class="group-stats">
+                                        <span id="groupMemberCount">1</span> tag
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Group management actions -->
+                            <div class="family-actions">
+                                <button class="btn btn-primary" id="createGroupBtn">
+                                    ➕ Új csoport létrehozása
+                                </button>
+                                <button class="btn btn-secondary" id="addFamilyMemberBtn">
+                                    👤 Családtag hozzáadása
+                                </button>
+                                <button class="btn btn-outline" id="manageGroupsBtn">
+                                    ⚙️ Csoportok kezelése
+                                </button>
+                            </div>
+
+                            <!-- Current group members -->
+                            <div id="currentGroupMembers" class="group-members-list">
+                                <h4>Csoporttagok:</h4>
+                                <div id="membersList">
+                                    <!-- Members will be loaded here -->
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -216,11 +244,11 @@
     <meta name="SUPABASE_ANON_KEY" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbWF6bnl5YXJ0cnN0bGlld2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NDUzMDAsImV4cCI6MjA3OTAyMTMwMH0.lRR78pV6NPSZa-pDrqOUPFK7gPBfWb6DqMAZKwNmX-A">
     
     <!-- App Scripts -->
-    <script src="pdf-processor.js?v=14"></script>
-    <script src="excel-processor.js?v=14"></script>
-    <script src="supabase-client.js?v=14"></script>
-    <script src="supabase-auth.js?v=14"></script>
-    <script src="family-manager.js?v=14"></script>
-    <script src="app.js?v=14"></script>
+    <script src="pdf-processor.js?v=15"></script>
+    <script src="excel-processor.js?v=15"></script>
+    <script src="supabase-client.js?v=15"></script>
+    <script src="supabase-auth.js?v=15"></script>
+    <script src="family-manager.js?v=15"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

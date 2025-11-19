@@ -34,6 +34,7 @@ class FamilyManager {
     setupUI() {
         this.createGroupManagementUI();
         this.createGroupSelector();
+        this.setupSettingsIntegration();
     }
 
     createGroupSelector() {
@@ -80,6 +81,9 @@ class FamilyManager {
             groupName.textContent = this.currentGroup?.group_name || 'Personal';
         }
         this.updateGroupDropdown();
+        
+        // Update Settings display when group changes
+        this.updateSettingsDisplay();
     }
 
     updateGroupDropdown() {
@@ -648,6 +652,116 @@ window.addEventListener('load', () => {
         sessionStorage.setItem('pendingInvite', inviteToken);
     }
 });
+
+FamilyManager.prototype.setupSettingsIntegration = function() {
+    // Update Settings panel with current group info
+    this.updateSettingsDisplay();
+    
+    // Setup Settings panel event listeners
+    const createGroupBtn = document.getElementById('createGroupBtn');
+    const addFamilyMemberBtn = document.getElementById('addFamilyMemberBtn');
+    const manageGroupsBtn = document.getElementById('manageGroupsBtn');
+    
+    if (createGroupBtn) {
+        createGroupBtn.addEventListener('click', () => this.showCreateGroup());
+    }
+    
+    if (addFamilyMemberBtn) {
+        addFamilyMemberBtn.addEventListener('click', () => {
+            const currentGroupId = this.currentGroup?.group_id;
+            if (currentGroupId) {
+                this.showInviteUsers(currentGroupId);
+            } else {
+                alert('Először hozzon létre egy csoportot, mielőtt családtagot adna hozzá.');
+            }
+        });
+    }
+    
+    if (manageGroupsBtn) {
+        manageGroupsBtn.addEventListener('click', () => this.showManageGroups());
+    }
+};
+
+FamilyManager.prototype.updateSettingsDisplay = function() {
+    const groupName = document.getElementById('currentGroupName');
+    const groupDescription = document.getElementById('currentGroupDescription');
+    const memberCount = document.getElementById('groupMemberCount');
+    
+    if (groupName) {
+        groupName.textContent = this.currentGroup?.group_name || 'Personal';
+    }
+    
+    if (groupDescription) {
+        if (this.currentGroup) {
+            groupDescription.textContent = 'Családi költségvetés csoport';
+        } else {
+            groupDescription.textContent = 'Személyes költségvetés';
+        }
+    }
+    
+    if (memberCount) {
+        memberCount.textContent = this.currentGroup?.member_count || 1;
+    }
+    
+    // Load and display current group members
+    this.loadCurrentGroupMembers();
+};
+
+FamilyManager.prototype.loadCurrentGroupMembers = async function() {
+    const membersList = document.getElementById('membersList');
+    if (!membersList) return;
+    
+    if (!this.currentGroup?.group_id) {
+        membersList.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Személyes mód - nincsenek csoporttagok</p>';
+        return;
+    }
+    
+    try {
+        const { data, error } = await this.supabase
+            .from('group_members')
+            .select(`
+                id,
+                role,
+                joined_at,
+                user_id,
+                users:user_id (email)
+            `)
+            .eq('group_id', this.currentGroup.group_id);
+            
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            membersList.innerHTML = data.map(member => `
+                <div class="member-item">
+                    <div class="member-info">
+                        <div class="member-name">${member.users?.email || 'Unknown'}</div>
+                        <div class="member-role">${this.translateRole(member.role)}</div>
+                    </div>
+                    <div class="member-actions">
+                        <small style="color: var(--text-secondary);">
+                            ${new Date(member.joined_at).toLocaleDateString('hu-HU')}
+                        </small>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            membersList.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Még nincsenek csoporttagok</p>';
+        }
+    } catch (error) {
+        console.error('Failed to load group members:', error);
+        membersList.innerHTML = '<p style="color: var(--danger-color); font-style: italic;">Hiba a csoporttagok betöltése során</p>';
+    }
+};
+
+FamilyManager.prototype.translateRole = function(role) {
+    const roleTranslations = {
+        'owner': 'Tulajdonos',
+        'admin': 'Adminisztrátor', 
+        'member': 'Családtag',
+        'viewer': 'Néző'
+    };
+    return roleTranslations[role] || role;
+};
 
 // Export for use
 if (typeof window !== 'undefined') {
