@@ -1105,6 +1105,186 @@ body {
     color: var(--bg-color);
 }
 
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.modal-close:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.transaction-info {
+    background: var(--bg-color);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.transaction-info strong {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.transaction-info small {
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    display: block;
+}
+
+/* Form styles inside modals */
+.modal .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.modal .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.modal label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.modal input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.modal label input[type="checkbox"] {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.modal small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Rule options section */
+#rule-options {
+    background: var(--bg-color);
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    margin-top: 1rem;
+}
+
+/* Responsive modal */
+@media (max-width: 768px) {
+    .modal-overlay {
+        padding: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .modal {
+        margin: 1rem 0;
+        max-height: calc(100vh - 2rem);
+    }
+    
+    .modal-header {
+        padding: 1rem 1rem 0.75rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    .modal-footer {
+        padding: 0.75rem 1rem 1rem;
+        flex-direction: column-reverse;
+    }
+    
+    .modal-footer .btn {
+        width: 100%;
+        margin: 0;
+    }
+}
+
 /* Auto dark mode support */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme]) {
